@@ -7,7 +7,7 @@ Choosing a Random Irreducible Polynomial
 
 The function RandomPolynomial() returns a new random polynomial of degree 53
 for use with the chunker. The degree 53 is chosen because it is the largest
-prime below 64-8 = 56, so that the top 8 bits of an uint64 can be used for
+prime below 64-8 = 56, so that the top 8 bits of an ulong can be used for
 optimising calculations in the chunker.
 
 A random polynomial is chosen selecting 64 random bits, masking away bits
@@ -123,16 +123,16 @@ public struct Chunk
 {
 	public uint Start;
 	public uint Length;
-	public uint64 Cut;
-	public byte[] Data;
+	public ulong Cut;
+	public ubyte[] Data;
 }
 
 private struct chunkerState
 {
-	private byte[windowSize] window;
+	private ubyte[windowSize] window;
 	private int wpos;
 
-	private byte[] buf;
+	private ubyte[] buf;
 	private uint bpos;
 	private uint bmax;
 
@@ -142,7 +142,7 @@ private struct chunkerState
 
 	private uint pre; // wait for this many bytes before start calculating an new chunk
 
-	private uint64 digest;
+	private ulong digest;
 }
 
 private struct chunkerConfig
@@ -153,7 +153,7 @@ private struct chunkerConfig
 	private uint polShift;
 	private tables tables;
 	private bool tablesInitialized;
-	private uint64 splitmask;
+	private ulong splitmask;
 
 	private io.Reader rd;
 	private bool closed;
@@ -170,7 +170,7 @@ public struct Chunker
 /// the lower averageBits, the higher amount of chunks will be identified.
 /// The default value is 20 bits, so chunks will be of 1MiB size on average.
 public void SetAverageBits(/*this*/ Chunker* c, int averageBits) {
-	c.splitmask = (1 << uint64(averageBits)) - 1;
+	c.splitmask = (1 << ulong(averageBits)) - 1;
 }
 
 /// New returns a new Chunker based on polynomial p that reads from rd.
@@ -183,7 +183,7 @@ public Chunker* New(io.Reader rd, Pol pol) {
 public Chunker* NewWithBoundaries(io.Reader rd, Pol pol, uint min, uint max) {
 	auto c = &Chunker{
 		chunkerState: chunkerState{
-			buf: make(byte[], chunkerBufSize),
+			buf: make(ubyte[], chunkerBufSize),
 		},
 		chunkerConfig: chunkerConfig{
 			pol:       pol,
@@ -274,7 +274,7 @@ private void fillTables(/*this*/ Chunker* c, ) {
 	for b := 0; b < 256; b++ {
 		var h Pol;
 
-		h = appendByte(h, byte(b), c.pol);
+		h = appendByte(h, ubyte(b), c.pol);
 		for i := 0; i < windowSize-1; i++ {
 			h = appendByte(h, 0, c.pol);
 		}
@@ -291,7 +291,7 @@ private void fillTables(/*this*/ Chunker* c, ) {
 		// two parts: Part A contains the result of the modulus operation, part
 		// B is used to cancel out the 8 top bits so that one XOR operation is
 		// enough to reduce modulo Polynomial
-		c.tables.mod[b] = Pol(uint64(b)<<uint(k)).Mod(c.pol) | (Pol(b) << uint(k));
+		c.tables.mod[b] = Pol(ulong(b)<<uint(k)).Mod(c.pol) | (Pol(b) << uint(k));
 	}
 
 	cache.entries[c.pol] = c.tables;
@@ -301,7 +301,7 @@ private void fillTables(/*this*/ Chunker* c, ) {
 /// occurs while reading, the error is returned. Afterwards, the state of the
 /// current chunk is undefined. When the last chunk has been returned, all
 /// subsequent calls yield an io.EOF error.
-public void Next(/*this*/ Chunker* c, byte[] data) (Chunk, error) {
+public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 	data = data[:0];
 	if !c.tablesInitialized {
 		return Chunk{}, errors.New("tables for polynomial computation not initialized");
@@ -378,18 +378,18 @@ public void Next(/*this*/ Chunker* c, byte[] data) (Chunk, error) {
 			// slide(b)
 			auto out = win[wpos];
 			win[wpos] = b;
-			digest ^= uint64(tabout[out]);
+			digest ^= ulong(tabout[out]);
 			wpos++;
 			if wpos >= windowSize {
 				wpos = 0;
 			}
 
 			// updateDigest
-			auto index = byte(digest >> polShift);
+			auto index = ubyte(digest >> polShift);
 			digest <<= 8;
-			digest |= uint64(b);
+			digest |= ulong(b);
 
-			digest ^= uint64(tabmod[index]);
+			digest ^= ulong(tabmod[index]);
 			// end manual inline
 
 			add++;
@@ -431,26 +431,26 @@ public void Next(/*this*/ Chunker* c, byte[] data) (Chunk, error) {
 	}
 }
 
-private (uint64 newDigest) updateDigest(uint64 digest, uint polShift, tables tab, byte b) {
+private (ulong newDigest) updateDigest(ulong digest, uint polShift, tables tab, ubyte b) {
 	auto index = digest >> polShift;
 	digest <<= 8;
-	digest |= uint64(b);
+	digest |= ulong(b);
 
-	digest ^= uint64(tab.mod[index]);
+	digest ^= ulong(tab.mod[index]);
 	return digest;
 }
 
-private void slide(/*this*/ Chunker* c, uint64 digest, byte b) (uint64 newDigest) {
+private void slide(/*this*/ Chunker* c, ulong digest, ubyte b) (ulong newDigest) {
 	auto out = c.window[c.wpos];
 	c.window[c.wpos] = b;
-	digest ^= uint64(c.tables.out[out]);
+	digest ^= ulong(c.tables.out[out]);
 	c.wpos = (c.wpos + 1) % windowSize;
 
 	digest = updateDigest(digest, c.polShift, c.tables, b);
 	return digest;
 }
 
-private Pol appendByte(Pol hash, byte b, Pol pol) {
+private Pol appendByte(Pol hash, ubyte b, Pol pol) {
 	hash <<= 8;
 	hash |= Pol(b);
 
@@ -460,7 +460,7 @@ private Pol appendByte(Pol hash, byte b, Pol pol) {
 // ----------------------------------------------------------- chunker_test.d
 module chunker.chunker_test;
 
-private byte[] parseDigest(string s) {
+private ubyte[] parseDigest(string s) {
 	d, err := hex.DecodeString(s);
 	if err != nil {
 		panic(err);
@@ -472,8 +472,8 @@ private byte[] parseDigest(string s) {
 private struct chunk
 {
 	public uint Length;
-	public uint64 CutFP;
-	public byte[] Digest;
+	public ulong CutFP;
+	public ubyte[] Digest;
 }
 
 /// polynomial used for all the tests below
@@ -604,22 +604,22 @@ private Chunk[] testWithData(testing*.T t, Chunker* chnker, chunk[] testChunks, 
 	return chunks;
 }
 
-private byte[] getRandom(int64 seed, int count) {
-	auto buf = make(byte[], count);
+private ubyte[] getRandom(long seed, int count) {
+	auto buf = make(ubyte[], count);
 
 	auto rnd = rand.New(rand.NewSource(seed));
 	for i := 0; i < count; i += 4 {
 		auto r = rnd.Uint32();
-		buf[i] = byte(r);
-		buf[i+1] = byte(r >> 8);
-		buf[i+2] = byte(r >> 16);
-		buf[i+3] = byte(r >> 24);
+		buf[i] = ubyte(r);
+		buf[i+1] = ubyte(r >> 8);
+		buf[i+2] = ubyte(r >> 16);
+		buf[i+3] = ubyte(r >> 24);
 	}
 
 	return buf;
 }
 
-private byte[] hashData(byte[] d) {
+private ubyte[] hashData(ubyte[] d) {
 	auto h = sha256.New();
 	h.Write(d);
 	return h.Sum(nil);
@@ -632,7 +632,7 @@ func TestChunker(testing*.T t) {
 	testWithData(t, ch, chunks1, true);
 
 	// setup nullbyte data source
-	buf = bytes.Repeat(byte[]{0}, len(chunks2)MinSize*);
+	buf = bytes.Repeat(ubyte[]{0}, len(chunks2)MinSize*);
 	ch = New(bytes.NewReader(buf), testPol);
 
 	testWithData(t, ch, chunks2, true);
@@ -712,7 +712,7 @@ func TestChunkerWithoutHash(testing*.T t) {
 	}
 
 	// setup nullbyte data source
-	buf = bytes.Repeat(byte[]{0}, len(chunks2)MinSize*);
+	buf = bytes.Repeat(ubyte[]{0}, len(chunks2)MinSize*);
 	ch = New(bytes.NewReader(buf), testPol);
 
 	testWithData(t, ch, chunks2, false);
@@ -722,10 +722,10 @@ func benchmarkChunker(testing*.B b, bool checkDigest) {
 	auto size = 32 * 1024 * 1024;
 	auto rd = bytes.NewReader(getRandom(23, size));
 	auto ch = New(rd, testPol);
-	auto buf = make(byte[], MaxSize);
+	auto buf = make(ubyte[], MaxSize);
 
 	b.ResetTimer();
-	b.SetBytes(int64(size));
+	b.SetBytes(long(size));
 
 	var chunks int;
 	for i := 0; i < b.N; i++ {
@@ -808,7 +808,7 @@ func ExampleChunker() {
 	auto chunker = New(bytes.NewReader(data), Pol(0x3DA3358B4DC173));
 
 	// reuse this buffer
-	auto buf = make(byte[], 8*1024*1024);
+	auto buf = make(ubyte[], 8*1024*1024);
 
 	for i := 0; i < 5; i++ {
 		chunk, err := chunker.Next(buf);
@@ -835,15 +835,15 @@ func ExampleChunker() {
 module chunker.polynomials;
 
 /// Pol is a polynomial from F_2[X].
-type Pol uint64
+type Pol ulong
 
 /// Add returns x+y.
 public Pol Add(/*this*/ Pol x, Pol y) {
-	auto r = Pol(uint64(x) ^ uint64(y));
+	auto r = Pol(ulong(x) ^ ulong(y));
 	return r;
 }
 
-/// mulOverflows returns true if the multiplication would overflow uint64.
+/// mulOverflows returns true if the multiplication would overflow ulong.
 /// Code by Rob Pike, see
 /// https://groups.google.com/d/msg/golang-nuts/h5oSN5t3Au4/KaNQREhZh0QJ
 private bool mulOverflows(Pol a, Pol b) {
@@ -877,7 +877,7 @@ private Pol mul(/*this*/ Pol x, Pol y) {
 /// Mul returns x*y. When an overflow occurs, Mul panics.
 public Pol Mul(/*this*/ Pol x, Pol y) {
 	if mulOverflows(x, y) {
-		panic("multiplication would overflow uint64");
+		panic("multiplication would overflow ulong");
 	}
 
 	return x.mul(y);
@@ -893,32 +893,32 @@ public int Deg(/*this*/ Pol x, ) {
 	// see https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
 
 	auto r = 0;
-	if uint64(x)&0xffffffff00000000 > 0 {
+	if ulong(x)&0xffffffff00000000 > 0 {
 		x >>= 32;
 		r |= 32;
 	}
 
-	if uint64(x)&0xffff0000 > 0 {
+	if ulong(x)&0xffff0000 > 0 {
 		x >>= 16;
 		r |= 16;
 	}
 
-	if uint64(x)&0xff00 > 0 {
+	if ulong(x)&0xff00 > 0 {
 		x >>= 8;
 		r |= 8;
 	}
 
-	if uint64(x)&0xf0 > 0 {
+	if ulong(x)&0xf0 > 0 {
 		x >>= 4;
 		r |= 4;
 	}
 
-	if uint64(x)&0xc > 0 {
+	if ulong(x)&0xc > 0 {
 		x >>= 2;
 		r |= 2;
 	}
 
-	if uint64(x)&0x2 > 0 {
+	if ulong(x)&0x2 > 0 {
 		r |= 1;
 	}
 
@@ -927,7 +927,7 @@ public int Deg(/*this*/ Pol x, ) {
 
 /// String returns the coefficients in hex.
 public string String(/*this*/ Pol x, ) {
-	return "0x" + strconv.FormatUint(uint64(x), 16);
+	return "0x" + strconv.FormatUint(ulong(x), 16);
 }
 
 /// Expand returns the string representation of the polynomial x.
@@ -1114,14 +1114,14 @@ private Pol qp(uint p, Pol g) {
 }
 
 /// MarshalJSON returns the JSON representation of the Pol.
-public void MarshalJSON(/*this*/ Pol x, ) (byte[], error) {
-	auto buf = strconv.AppendUint(byte[]{'"'}, uint64(x), 16);
+public void MarshalJSON(/*this*/ Pol x, ) (ubyte[], error) {
+	auto buf = strconv.AppendUint(ubyte[]{'"'}, ulong(x), 16);
 	buf = append(buf, '"');
 	return buf, nil;
 }
 
 /// UnmarshalJSON parses a Pol from the JSON data.
-public error UnmarshalJSON(/*this*/ Pol* x, byte[] data) {
+public error UnmarshalJSON(/*this*/ Pol* x, ubyte[] data) {
 	if len(data) < 2 {
 		return errors.New("invalid string for polynomial");
 	}
@@ -1229,7 +1229,7 @@ func TestPolMulOverflow(testing*.T t) {
 		// try to recover overflow error
 		auto err = recover();
 
-		if e, ok := err.(string); ok && e == "multiplication would overflow uint64" {
+		if e, ok := err.(string); ok && e == "multiplication would overflow ulong" {
 			return;
 		}
 
