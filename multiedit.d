@@ -82,7 +82,7 @@ Use of this source code is governed by a BSD-style
 license that can be found in the LICENSE file.
 */
 
-package chunker
+module chunker;
 
 import (
 	"errors"
@@ -457,7 +457,7 @@ func appendByte(hash Pol, b byte, pol Pol) Pol {
 }
 
 // ----------------------------------------------------------- chunker_test.d
-package chunker
+module chunker.chunker_test;
 
 import (
 	"bytes"
@@ -806,7 +806,7 @@ func BenchmarkNewChunker(b *testing.B) {
 }
 
 // ----------------------------------------------------------- example_test.d
-package chunker
+module chunker.example_test;
 
 import (
 	"bytes"
@@ -847,7 +847,7 @@ func ExampleChunker() {
 }
 
 // ----------------------------------------------------------- polynomials.d
-package chunker
+module chunker.polynomials;
 
 import (
 	"crypto/rand"
@@ -1159,7 +1159,7 @@ func (x *Pol) UnmarshalJSON(data []byte) error {
 }
 
 // ----------------------------------------------------------- polynomials_test.d
-package chunker
+module chunker.polynomials_test;
 
 import (
 	"strconv"
