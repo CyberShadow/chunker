@@ -98,7 +98,8 @@ public enum MaxSize = 8 * miB;
 private enum chunkerBufSize = 512 * kiB;
 
 
-type tables struct {
+private struct tables
+{
 	out [256]Pol
 	mod [256]Pol
 }
@@ -115,14 +116,16 @@ func init() {
 
 // Chunk is one content-dependent chunk of bytes whose end was cut when the
 // Rabin Fingerprint had the value stored in Cut.
-type Chunk struct {
+public struct Chunk
+{
 	Start  uint
 	Length uint
 	Cut    uint64
 	Data   []byte
 }
 
-type chunkerState struct {
+private struct chunkerState
+{
 	window [windowSize]byte
 	wpos   int
 
@@ -139,7 +142,8 @@ type chunkerState struct {
 	digest uint64
 }
 
-type chunkerConfig struct {
+private struct chunkerConfig
+{
 	MinSize, MaxSize uint
 
 	pol               Pol
@@ -153,7 +157,8 @@ type chunkerConfig struct {
 }
 
 // Chunker splits content with Rabin Fingerprints.
-type Chunker struct {
+public struct Chunker
+{
 	chunkerConfig
 	chunkerState
 }
@@ -461,7 +466,8 @@ func parseDigest(s string) []byte {
 	return d
 }
 
-type chunk struct {
+private struct chunk
+{
 	Length uint
 	CutFP  uint64
 	Digest []byte
