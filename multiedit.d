@@ -169,18 +169,18 @@ public struct Chunker
 // SetAverageBits allows to control the frequency of chunk discovery:
 // the lower averageBits, the higher amount of chunks will be identified.
 // The default value is 20 bits, so chunks will be of 1MiB size on average.
-func (c *Chunker) SetAverageBits(averageBits int) {
+func (c Chunker*) SetAverageBits(averageBits int) {
 	c.splitmask = (1 << uint64(averageBits)) - 1
 }
 
 // New returns a new Chunker based on polynomial p that reads from rd.
-func New(rd io.Reader, pol Pol) *Chunker {
+func New(rd io.Reader, pol Pol) Chunker* {
 	return NewWithBoundaries(rd, pol, MinSize, MaxSize)
 }
 
 // NewWithBoundaries returns a new Chunker based on polynomial p that reads from
 // rd and custom min and max size boundaries.
-func NewWithBoundaries(rd io.Reader, pol Pol, min, max uint) *Chunker {
+func NewWithBoundaries(rd io.Reader, pol Pol, min, max uint) Chunker* {
 	c := &Chunker{
 		chunkerState: chunkerState{
 			buf: make(byte[], chunkerBufSize),
@@ -200,14 +200,14 @@ func NewWithBoundaries(rd io.Reader, pol Pol, min, max uint) *Chunker {
 }
 
 // Reset reinitializes the chunker with a new reader and polynomial.
-func (c *Chunker) Reset(rd io.Reader, pol Pol) {
+func (c Chunker*) Reset(rd io.Reader, pol Pol) {
 	c.ResetWithBoundaries(rd, pol, MinSize, MaxSize)
 }
 
 // ResetWithBoundaries reinitializes the chunker with a new reader, polynomial
 // and custom min and max size boundaries.
-func (c *Chunker) ResetWithBoundaries(rd io.Reader, pol Pol, min, max uint) {
-	*c = Chunker{
+func (c Chunker*) ResetWithBoundaries(rd io.Reader, pol Pol, min, max uint) {
+	c* = Chunker{
 		chunkerState: chunkerState{
 			buf: c.buf,
 		},
@@ -223,7 +223,7 @@ func (c *Chunker) ResetWithBoundaries(rd io.Reader, pol Pol, min, max uint) {
 	c.reset()
 }
 
-func (c *Chunker) reset() {
+func (c Chunker*) reset() {
 	c.polShift = uint(c.pol.Deg() - 8)
 	c.fillTables()
 
@@ -244,7 +244,7 @@ func (c *Chunker) reset() {
 
 // fillTables calculates out_table and mod_table for optimization. This
 // implementation uses a cache in the global variable cache.
-func (c *Chunker) fillTables() {
+func (c Chunker*) fillTables() {
 	// if polynomial hasn't been specified, do not compute anything for now
 	if c.pol == 0 {
 		return
@@ -301,7 +301,7 @@ func (c *Chunker) fillTables() {
 // occurs while reading, the error is returned. Afterwards, the state of the
 // current chunk is undefined. When the last chunk has been returned, all
 // subsequent calls yield an io.EOF error.
-func (c *Chunker) Next(data byte[]) (Chunk, error) {
+func (c Chunker*) Next(data byte[]) (Chunk, error) {
 	data = data[:0]
 	if !c.tablesInitialized {
 		return Chunk{}, errors.New("tables for polynomial computation not initialized")
@@ -440,7 +440,7 @@ func updateDigest(digest uint64, polShift uint, tab tables, b byte) (newDigest u
 	return digest
 }
 
-func (c *Chunker) slide(digest uint64, b byte) (newDigest uint64) {
+func (c Chunker*) slide(digest uint64, b byte) (newDigest uint64) {
 	out := c.window[c.wpos]
 	c.window[c.wpos] = b
 	digest ^= uint64(c.tables.out[out])
@@ -554,7 +554,7 @@ var chunks3 = chunk[]{
 	chunk{237392, 0x0000000000000001, parseDigest("fcd567f5d866357a8e299fd5b2359bb2c8157c30395229c4e9b0a353944a7978")},
 }
 
-func testWithData(t *testing.T, chnker *Chunker, testChunks chunk[], checkDigest bool) Chunk[] {
+func testWithData(t testing*.T, chnker Chunker*, testChunks chunk[], checkDigest bool) Chunk[] {
 	chunks := Chunk[]{}
 
 	pos := uint(0)
@@ -625,20 +625,20 @@ func hashData(d byte[]) byte[] {
 	return h.Sum(nil)
 }
 
-func TestChunker(t *testing.T) {
+func TestChunker(t testing*.T) {
 	// setup data source
 	buf := getRandom(23, 32*1024*1024)
 	ch := New(bytes.NewReader(buf), testPol)
 	testWithData(t, ch, chunks1, true)
 
 	// setup nullbyte data source
-	buf = bytes.Repeat(byte[]{0}, len(chunks2)*MinSize)
+	buf = bytes.Repeat(byte[]{0}, len(chunks2)MinSize*)
 	ch = New(bytes.NewReader(buf), testPol)
 
 	testWithData(t, ch, chunks2, true)
 }
 
-func TestChunkerWithCustomAverageBits(t *testing.T) {
+func TestChunkerWithCustomAverageBits(t testing*.T) {
 	buf := getRandom(23, 32*1024*1024)
 	ch := New(bytes.NewReader(buf), testPol)
 
@@ -647,7 +647,7 @@ func TestChunkerWithCustomAverageBits(t *testing.T) {
 	testWithData(t, ch, chunks3, true)
 }
 
-func TestChunkerReset(t *testing.T) {
+func TestChunkerReset(t testing*.T) {
 	buf := getRandom(23, 32*1024*1024)
 	ch := New(bytes.NewReader(buf), testPol)
 	testWithData(t, ch, chunks1, true)
@@ -656,7 +656,7 @@ func TestChunkerReset(t *testing.T) {
 	testWithData(t, ch, chunks1, true)
 }
 
-func TestChunkerWithRandomPolynomial(t *testing.T) {
+func TestChunkerWithRandomPolynomial(t testing*.T) {
 	// setup data source
 	buf := getRandom(23, 32*1024*1024)
 
@@ -691,7 +691,7 @@ func TestChunkerWithRandomPolynomial(t *testing.T) {
 	}
 }
 
-func TestChunkerWithoutHash(t *testing.T) {
+func TestChunkerWithoutHash(t testing*.T) {
 	// setup data source
 	buf := getRandom(23, 32*1024*1024)
 
@@ -712,13 +712,13 @@ func TestChunkerWithoutHash(t *testing.T) {
 	}
 
 	// setup nullbyte data source
-	buf = bytes.Repeat(byte[]{0}, len(chunks2)*MinSize)
+	buf = bytes.Repeat(byte[]{0}, len(chunks2)MinSize*)
 	ch = New(bytes.NewReader(buf), testPol)
 
 	testWithData(t, ch, chunks2, false)
 }
 
-func benchmarkChunker(b *testing.B, checkDigest bool) {
+func benchmarkChunker(b testing*.B, checkDigest bool) {
 	size := 32 * 1024 * 1024
 	rd := bytes.NewReader(getRandom(23, size))
 	ch := New(rd, testPol)
@@ -776,15 +776,15 @@ func benchmarkChunker(b *testing.B, checkDigest bool) {
 	b.Logf("%d chunks, average chunk size: %d bytes", chunks, size/chunks)
 }
 
-func BenchmarkChunkerWithSHA256(b *testing.B) {
+func BenchmarkChunkerWithSHA256(b testing*.B) {
 	benchmarkChunker(b, true)
 }
 
-func BenchmarkChunker(b *testing.B) {
+func BenchmarkChunker(b testing*.B) {
 	benchmarkChunker(b, false)
 }
 
-func BenchmarkNewChunker(b *testing.B) {
+func BenchmarkNewChunker(b testing*.B) {
 	p, err := RandomPolynomial()
 	if err != nil {
 		b.Fatal(err)
@@ -1121,7 +1121,7 @@ func (x Pol) MarshalJSON() (byte[], error) {
 }
 
 // UnmarshalJSON parses a Pol from the JSON data.
-func (x *Pol) UnmarshalJSON(data byte[]) error {
+func (x Pol*) UnmarshalJSON(data byte[]) error {
 	if len(data) < 2 {
 		return errors.New("invalid string for polynomial")
 	}
@@ -1129,7 +1129,7 @@ func (x *Pol) UnmarshalJSON(data byte[]) error {
 	if err != nil {
 		return err
 	}
-	*x = Pol(n)
+	x* = Pol(n)
 
 	return nil
 }
@@ -1146,7 +1146,7 @@ var polAddTests = struct[] {
 	{0x9a7e30d1e855e0a0, 0x9a7e30d1e855e0a0, 0},
 }
 
-func TestPolAdd(t *testing.T) {
+func TestPolAdd(t testing*.T) {
 	for i, test := range polAddTests {
 		if test.sum != test.x.Add(test.y) {
 			t.Errorf("test %d failed: sum != x+y", i)
@@ -1209,7 +1209,7 @@ var polMulTests = struct[] {
 	},
 }
 
-func TestPolMul(t *testing.T) {
+func TestPolMul(t testing*.T) {
 	for i, test := range polMulTests {
 		m := test.x.Mul(test.y)
 		if test.res != m {
@@ -1224,7 +1224,7 @@ func TestPolMul(t *testing.T) {
 	}
 }
 
-func TestPolMulOverflow(t *testing.T) {
+func TestPolMulOverflow(t testing*.T) {
 	defer func() {
 		// try to recover overflow error
 		err := recover()
@@ -1272,7 +1272,7 @@ var polDivTests = struct[] {
 	},
 }
 
-func TestPolDiv(t *testing.T) {
+func TestPolDiv(t testing*.T) {
 	for i, test := range polDivTests {
 		m := test.x.Div(test.y)
 		if test.res != m {
@@ -1282,7 +1282,7 @@ func TestPolDiv(t *testing.T) {
 	}
 }
 
-func TestPolDeg(t *testing.T) {
+func TestPolDeg(t testing*.T) {
 	var x Pol
 	if x.Deg() != -1 {
 		t.Errorf("deg(0) is not -1: %v", x.Deg())
@@ -1330,7 +1330,7 @@ var polModTests = struct[] {
 	},
 }
 
-func TestPolModt(t *testing.T) {
+func TestPolModt(t testing*.T) {
 	for i, test := range polModTests {
 		res := test.x.Mod(test.y)
 		if test.res != res {
@@ -1339,7 +1339,7 @@ func TestPolModt(t *testing.T) {
 	}
 }
 
-func BenchmarkPolDivMod(t *testing.B) {
+func BenchmarkPolDivMod(t testing*.B) {
 	f := Pol(0x2482734cacca49)
 	g := Pol(0x3af4b284899)
 
@@ -1348,7 +1348,7 @@ func BenchmarkPolDivMod(t *testing.B) {
 	}
 }
 
-func BenchmarkPolDiv(t *testing.B) {
+func BenchmarkPolDiv(t testing*.B) {
 	f := Pol(0x2482734cacca49)
 	g := Pol(0x3af4b284899)
 
@@ -1357,7 +1357,7 @@ func BenchmarkPolDiv(t *testing.B) {
 	}
 }
 
-func BenchmarkPolMod(t *testing.B) {
+func BenchmarkPolMod(t testing*.B) {
 	f := Pol(0x2482734cacca49)
 	g := Pol(0x3af4b284899)
 
@@ -1366,7 +1366,7 @@ func BenchmarkPolMod(t *testing.B) {
 	}
 }
 
-func BenchmarkPolDeg(t *testing.B) {
+func BenchmarkPolDeg(t testing*.B) {
 	f := Pol(0x3af4b284899)
 	d := f.Deg()
 	if d != 41 {
@@ -1379,14 +1379,14 @@ func BenchmarkPolDeg(t *testing.B) {
 	}
 }
 
-func TestRandomPolynomial(t *testing.T) {
+func TestRandomPolynomial(t testing*.T) {
 	_, err := RandomPolynomial()
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-func BenchmarkRandomPolynomial(t *testing.B) {
+func BenchmarkRandomPolynomial(t testing*.B) {
 	for i := 0; i < t.N; i++ {
 		_, err := RandomPolynomial()
 		if err != nil {
@@ -1395,7 +1395,7 @@ func BenchmarkRandomPolynomial(t *testing.B) {
 	}
 }
 
-func TestExpandPolynomial(t *testing.T) {
+func TestExpandPolynomial(t testing*.T) {
 	pol := Pol(0x3DA3358B4DC173)
 	s := pol.Expand()
 	if s != "x^53+x^52+x^51+x^50+x^48+x^47+x^45+x^41+x^40+x^37+x^36+x^34+x^32+x^31+x^27+x^25+x^24+x^22+x^19+x^18+x^16+x^15+x^14+x^8+x^6+x^5+x^4+x+1" {
@@ -1433,7 +1433,7 @@ var polIrredTests = struct[] {
 	{0x3143d0464b3299, false},
 }
 
-func TestPolIrreducible(t *testing.T) {
+func TestPolIrreducible(t testing*.T) {
 	for _, test := range polIrredTests {
 		if test.f.Irreducible() != test.irred {
 			t.Errorf("Irreducibility test for Polynomial %v failed: got %v, wanted %v",
@@ -1442,7 +1442,7 @@ func TestPolIrreducible(t *testing.T) {
 	}
 }
 
-func BenchmarkPolIrreducible(b *testing.B) {
+func BenchmarkPolIrreducible(b testing*.B) {
 	// find first irreducible polynomial
 	var pol Pol
 	for _, test := range polIrredTests {
@@ -1509,7 +1509,7 @@ var polGCDTests = struct[] {
 	},
 }
 
-func TestPolGCD(t *testing.T) {
+func TestPolGCD(t testing*.T) {
 	for i, test := range polGCDTests {
 		gcd := test.f1.GCD(test.f2)
 		if test.gcd != gcd {
@@ -1545,7 +1545,7 @@ var polMulModTests = struct[] {
 	},
 }
 
-func TestPolMulMod(t *testing.T) {
+func TestPolMulMod(t testing*.T) {
 	for i, test := range polMulModTests {
 		mod := test.f1.MulMod(test.f2, test.g)
 		if mod != test.mod {
