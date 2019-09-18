@@ -84,12 +84,6 @@ license that can be found in the LICENSE file.
 
 module chunker;
 
-import (
-	"errors"
-	"io"
-	"sync"
-)
-
 const (
 	kiB = 1024
 	miB = 1024 * kiB
@@ -459,16 +453,6 @@ func appendByte(hash Pol, b byte, pol Pol) Pol {
 // ----------------------------------------------------------- chunker_test.d
 module chunker.chunker_test;
 
-import (
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
-	"io"
-	"math/rand"
-	"testing"
-	"time"
-)
-
 func parseDigest(s string) []byte {
 	d, err := hex.DecodeString(s)
 	if err != nil {
@@ -808,13 +792,6 @@ func BenchmarkNewChunker(b *testing.B) {
 // ----------------------------------------------------------- example_test.d
 module chunker.example_test;
 
-import (
-	"bytes"
-	"crypto/sha256"
-	"fmt"
-	"io"
-)
-
 func ExampleChunker() {
 	// generate 32MiB of deterministic pseudo-random data
 	data := getRandom(23, 32*1024*1024)
@@ -848,15 +825,6 @@ func ExampleChunker() {
 
 // ----------------------------------------------------------- polynomials.d
 module chunker.polynomials;
-
-import (
-	"crypto/rand"
-	"encoding/binary"
-	"errors"
-	"fmt"
-	"io"
-	"strconv"
-)
 
 // Pol is a polynomial from F_2[X].
 type Pol uint64
@@ -1160,11 +1128,6 @@ func (x *Pol) UnmarshalJSON(data []byte) error {
 
 // ----------------------------------------------------------- polynomials_test.d
 module chunker.polynomials_test;
-
-import (
-	"strconv"
-	"testing"
-)
 
 var polAddTests = []struct {
 	x, y Pol
