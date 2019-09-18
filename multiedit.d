@@ -1,4 +1,4 @@
-// ----------------------------------------------------------- chunker.go
+// ----------------------------------------------------------- chunker.d
 package chunker
 
 import (
@@ -373,7 +373,7 @@ func appendByte(hash Pol, b byte, pol Pol) Pol {
 	return hash.Mod(pol)
 }
 
-// ----------------------------------------------------------- chunker_test.go
+// ----------------------------------------------------------- chunker_test.d
 package chunker
 
 import (
@@ -722,7 +722,7 @@ func BenchmarkNewChunker(b *testing.B) {
 	}
 }
 
-// ----------------------------------------------------------- doc.go
+// ----------------------------------------------------------- doc.d
 // Copyright 2014 Alexander Neumann. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
@@ -806,7 +806,7 @@ http://crcutil.googlecode.com/files/crc-doc.1.0.pdf
 */
 package chunker
 
-// ----------------------------------------------------------- example_test.go
+// ----------------------------------------------------------- example_test.d
 package chunker
 
 import (
@@ -847,7 +847,7 @@ func ExampleChunker() {
 	// 2222372 6ba5e9f7e1b310722be3627716cf469be941f7f3e39a4c3bcefea492ec31ee56
 }
 
-// ----------------------------------------------------------- polynomials.go
+// ----------------------------------------------------------- polynomials.d
 package chunker
 
 import (
@@ -1159,7 +1159,7 @@ func (x *Pol) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ----------------------------------------------------------- polynomials_test.go
+// ----------------------------------------------------------- polynomials_test.d
 package chunker
 
 import (
