@@ -181,22 +181,22 @@ public Chunker* New(io.Reader rd, Pol pol) {
 /// NewWithBoundaries returns a new Chunker based on polynomial p that reads from
 /// rd and custom min and max size boundaries.
 public Chunker* NewWithBoundaries(io.Reader rd, Pol pol, uint min, uint max) {
-	auto c = &Chunker{
-		chunkerState: chunkerState{
+	Chunker c = {
+		chunkerState: {
 			buf: new ubyte[chunkerBufSize],
 		},
-		chunkerConfig: chunkerConfig{
+		chunkerConfig: {
 			pol:       pol,
 			rd:        rd,
 			MinSize:   min,
 			MaxSize:   max,
 			splitmask: (1 << 20) - 1, // aim to create chunks of 20 bits or about 1MiB on average.
 		},
-	}
+	};
 
 	c.reset();
 
-	return c;
+	return [c].ptr;
 }
 
 /// Reset reinitializes the chunker with a new reader and polynomial.
@@ -207,18 +207,19 @@ public void Reset(/*this*/ Chunker* c, io.Reader rd, Pol pol) {
 /// ResetWithBoundaries reinitializes the chunker with a new reader, polynomial
 /// and custom min and max size boundaries.
 public void ResetWithBoundaries(/*this*/ Chunker* c, io.Reader rd, Pol pol, uint min, uint max) {
-	c* = Chunker{
-		chunkerState: chunkerState{
-			buf: c.buf,
+	Chunker v = {
+		chunkerState: {
+			buf: new ubyte[chunkerBufSize],
 		},
-		chunkerConfig: chunkerConfig{
+		chunkerConfig: {
 			pol:       pol,
 			rd:        rd,
 			MinSize:   min,
 			MaxSize:   max,
-			splitmask: (1 << 20) - 1,
+			splitmask: (1 << 20) - 1, // aim to create chunks of 20 bits or about 1MiB on average.
 		},
-	}
+	};
+	*c = v;
 
 	c.reset();
 }
