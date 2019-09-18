@@ -104,7 +104,7 @@ private struct tables
 	private Pol[256] mod;
 }
 
-// cache precomputed tables, these are read-only anyway
+/// cache precomputed tables, these are read-only anyway
 private struct cache
 {
 static:
@@ -117,8 +117,8 @@ static this()
 	cache.mutex = new Object;
 }
 
-// Chunk is one content-dependent chunk of bytes whose end was cut when the
-// Rabin Fingerprint had the value stored in Cut.
+/// Chunk is one content-dependent chunk of bytes whose end was cut when the
+/// Rabin Fingerprint had the value stored in Cut.
 public struct Chunk
 {
 	public uint Start;
@@ -159,27 +159,27 @@ private struct chunkerConfig
 	private bool closed;
 }
 
-// Chunker splits content with Rabin Fingerprints.
+/// Chunker splits content with Rabin Fingerprints.
 public struct Chunker
 {
 	chunkerConfig chunkerConfig;
 	chunkerState chunkerState;
 }
 
-// SetAverageBits allows to control the frequency of chunk discovery:
-// the lower averageBits, the higher amount of chunks will be identified.
-// The default value is 20 bits, so chunks will be of 1MiB size on average.
+/// SetAverageBits allows to control the frequency of chunk discovery:
+/// the lower averageBits, the higher amount of chunks will be identified.
+/// The default value is 20 bits, so chunks will be of 1MiB size on average.
 public void SetAverageBits(/*this*/ Chunker* c, int averageBits) {
 	c.splitmask = (1 << uint64(averageBits)) - 1;
 }
 
-// New returns a new Chunker based on polynomial p that reads from rd.
+/// New returns a new Chunker based on polynomial p that reads from rd.
 public Chunker* New(io.Reader rd, Pol pol) {
 	return NewWithBoundaries(rd, pol, MinSize, MaxSize);
 }
 
-// NewWithBoundaries returns a new Chunker based on polynomial p that reads from
-// rd and custom min and max size boundaries.
+/// NewWithBoundaries returns a new Chunker based on polynomial p that reads from
+/// rd and custom min and max size boundaries.
 public Chunker* NewWithBoundaries(io.Reader rd, Pol pol, uint min, uint max) {
 	auto c = &Chunker{
 		chunkerState: chunkerState{
@@ -199,13 +199,13 @@ public Chunker* NewWithBoundaries(io.Reader rd, Pol pol, uint min, uint max) {
 	return c;
 }
 
-// Reset reinitializes the chunker with a new reader and polynomial.
+/// Reset reinitializes the chunker with a new reader and polynomial.
 public void Reset(/*this*/ Chunker* c, io.Reader rd, Pol pol) {
 	c.ResetWithBoundaries(rd, pol, MinSize, MaxSize);
 }
 
-// ResetWithBoundaries reinitializes the chunker with a new reader, polynomial
-// and custom min and max size boundaries.
+/// ResetWithBoundaries reinitializes the chunker with a new reader, polynomial
+/// and custom min and max size boundaries.
 public void ResetWithBoundaries(/*this*/ Chunker* c, io.Reader rd, Pol pol, uint min, uint max) {
 	c* = Chunker{
 		chunkerState: chunkerState{
@@ -242,8 +242,8 @@ private void reset(/*this*/ Chunker* c, ) {
 	c.pre = c.MinSize - windowSize;
 }
 
-// fillTables calculates out_table and mod_table for optimization. This
-// implementation uses a cache in the global variable cache.
+/// fillTables calculates out_table and mod_table for optimization. This
+/// implementation uses a cache in the global variable cache.
 private void fillTables(/*this*/ Chunker* c, ) {
 	// if polynomial hasn't been specified, do not compute anything for now
 	if c.pol == 0 {
@@ -297,10 +297,10 @@ private void fillTables(/*this*/ Chunker* c, ) {
 	cache.entries[c.pol] = c.tables;
 }
 
-// Next returns the position and length of the next chunk of data. If an error
-// occurs while reading, the error is returned. Afterwards, the state of the
-// current chunk is undefined. When the last chunk has been returned, all
-// subsequent calls yield an io.EOF error.
+/// Next returns the position and length of the next chunk of data. If an error
+/// occurs while reading, the error is returned. Afterwards, the state of the
+/// current chunk is undefined. When the last chunk has been returned, all
+/// subsequent calls yield an io.EOF error.
 public void Next(/*this*/ Chunker* c, byte[] data) (Chunk, error) {
 	data = data[:0];
 	if !c.tablesInitialized {
@@ -476,15 +476,15 @@ private struct chunk
 	public byte[] Digest;
 }
 
-// polynomial used for all the tests below
+/// polynomial used for all the tests below
 private enum testPol = Pol(0x3DA3358B4DC173);
 
-// created for 32MB of random data out of math/rand's Uint32() seeded by
-// constant 23
+/// created for 32MB of random data out of math/rand's Uint32() seeded by
+/// constant 23
 //
-// chunking configuration:
-// window size 64, avg chunksize 1<<20, min chunksize 1<<19, max chunksize 1<<23
-// polynom 0x3DA3358B4DC173
+/// chunking configuration:
+/// window size 64, avg chunksize 1<<20, min chunksize 1<<19, max chunksize 1<<23
+/// polynom 0x3DA3358B4DC173
 var chunks1 = chunk[]{
 	chunk{2163460, 0x000b98d4cdf00000, parseDigest("4b94cb2cf293855ea43bf766731c74969b91aa6bf3c078719aabdd19860d590d")},
 	chunk{643703, 0x000d4e8364d00000, parseDigest("5727a63c0964f365ab8ed2ccf604912f2ea7be29759a2b53ede4d6841e397407")},
@@ -511,7 +511,7 @@ var chunks1 = chunk[]{
 	chunk{237392, 0x0000000000000001, parseDigest("fcd567f5d866357a8e299fd5b2359bb2c8157c30395229c4e9b0a353944a7978")},
 }
 
-// test if nullbytes are correctly split, even if length is a multiple of MinSize.
+/// test if nullbytes are correctly split, even if length is a multiple of MinSize.
 var chunks2 = chunk[]{
 	chunk{MinSize, 0, parseDigest("07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541")},
 	chunk{MinSize, 0, parseDigest("07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541")},
@@ -519,7 +519,7 @@ var chunks2 = chunk[]{
 	chunk{MinSize, 0, parseDigest("07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541")},
 }
 
-// the same as chunks1, but avg chunksize is 1<<19
+/// the same as chunks1, but avg chunksize is 1<<19
 var chunks3 = chunk[]{
 	chunk{1491586, 0x00023e586ea80000, parseDigest("4c008237df602048039287427171cef568a6cb965d1b5ca28dc80504a24bb061")},
 	chunk{671874, 0x000b98d4cdf00000, parseDigest("fa8a42321b90c3d4ce9dd850562b2fd0c0fe4bdd26cf01a24f22046a224225d3")},
@@ -834,18 +834,18 @@ func ExampleChunker() {
 // ----------------------------------------------------------- polynomials.d
 module chunker.polynomials;
 
-// Pol is a polynomial from F_2[X].
+/// Pol is a polynomial from F_2[X].
 type Pol uint64
 
-// Add returns x+y.
+/// Add returns x+y.
 public Pol Add(/*this*/ Pol x, Pol y) {
 	auto r = Pol(uint64(x) ^ uint64(y));
 	return r;
 }
 
-// mulOverflows returns true if the multiplication would overflow uint64.
-// Code by Rob Pike, see
-// https://groups.google.com/d/msg/golang-nuts/h5oSN5t3Au4/KaNQREhZh0QJ
+/// mulOverflows returns true if the multiplication would overflow uint64.
+/// Code by Rob Pike, see
+/// https://groups.google.com/d/msg/golang-nuts/h5oSN5t3Au4/KaNQREhZh0QJ
 private bool mulOverflows(Pol a, Pol b) {
 	if a <= 1 || b <= 1 {
 		return false;
@@ -874,7 +874,7 @@ private Pol mul(/*this*/ Pol x, Pol y) {
 	return res;
 }
 
-// Mul returns x*y. When an overflow occurs, Mul panics.
+/// Mul returns x*y. When an overflow occurs, Mul panics.
 public Pol Mul(/*this*/ Pol x, Pol y) {
 	if mulOverflows(x, y) {
 		panic("multiplication would overflow uint64");
@@ -883,7 +883,7 @@ public Pol Mul(/*this*/ Pol x, Pol y) {
 	return x.mul(y);
 }
 
-// Deg returns the degree of the polynomial x. If x is zero, -1 is returned.
+/// Deg returns the degree of the polynomial x. If x is zero, -1 is returned.
 public int Deg(/*this*/ Pol x, ) {
 	// the degree of 0 is -1
 	if x == 0 {
@@ -925,12 +925,12 @@ public int Deg(/*this*/ Pol x, ) {
 	return r;
 }
 
-// String returns the coefficients in hex.
+/// String returns the coefficients in hex.
 public string String(/*this*/ Pol x, ) {
 	return "0x" + strconv.FormatUint(uint64(x), 16);
 }
 
-// Expand returns the string representation of the polynomial x.
+/// Expand returns the string representation of the polynomial x.
 public string Expand(/*this*/ Pol x, ) {
 	if x == 0 {
 		return "0";
@@ -954,8 +954,8 @@ public string Expand(/*this*/ Pol x, ) {
 	return s[1:];
 }
 
-// DivMod returns x / d = q, and remainder r,
-// see https://en.wikipedia.org/wiki/Division_algorithm
+/// DivMod returns x / d = q, and remainder r,
+/// see https://en.wikipedia.org/wiki/Division_algorithm
 public void DivMod(/*this*/ Pol x, Pol d) (Pol, Pol) {
 	if x == 0 {
 		return 0, 0;
@@ -983,37 +983,37 @@ public void DivMod(/*this*/ Pol x, Pol d) (Pol, Pol) {
 	return q, x;
 }
 
-// Div returns the integer division result x / d.
+/// Div returns the integer division result x / d.
 public Pol Div(/*this*/ Pol x, Pol d) {
 	q, _ := x.DivMod(d);
 	return q;
 }
 
-// Mod returns the remainder of x / d
+/// Mod returns the remainder of x / d
 public Pol Mod(/*this*/ Pol x, Pol d) {
 	_, r := x.DivMod(d);
 	return r;
 }
 
-// I really dislike having a function that does not terminate, so specify a
-// really large upper bound for finding a new irreducible polynomial, and
-// return an error when no irreducible polynomial has been found within
-// randPolMaxTries.
+/// I really dislike having a function that does not terminate, so specify a
+/// really large upper bound for finding a new irreducible polynomial, and
+/// return an error when no irreducible polynomial has been found within
+/// randPolMaxTries.
 private enum randPolMaxTries = 1e6;
 
-// RandomPolynomial returns a new random irreducible polynomial
-// of degree 53 using the default System CSPRNG as source.
-// It is equivalent to calling DerivePolynomial(rand.Reader).
+/// RandomPolynomial returns a new random irreducible polynomial
+/// of degree 53 using the default System CSPRNG as source.
+/// It is equivalent to calling DerivePolynomial(rand.Reader).
 public (Pol, error) RandomPolynomial() {
 	return DerivePolynomial(rand.Reader);
 }
 
-// DerivePolynomial returns an irreducible polynomial of degree 53
-// (largest prime number below 64-8) by reading bytes from source.
-// There are (2^53-2/53) irreducible polynomials of degree 53 in
-// F_2[X], c.f. Michael O. Rabin (1981): "Fingerprinting by Random
-// Polynomials", page 4. If no polynomial could be found in one
-// million tries, an error is returned.
+/// DerivePolynomial returns an irreducible polynomial of degree 53
+/// (largest prime number below 64-8) by reading bytes from source.
+/// There are (2^53-2/53) irreducible polynomials of degree 53 in
+/// F_2[X], c.f. Michael O. Rabin (1981): "Fingerprinting by Random
+/// Polynomials", page 4. If no polynomial could be found in one
+/// million tries, an error is returned.
 public (Pol, error) DerivePolynomial(io.Reader source) {
 	for i := 0; i < randPolMaxTries; i++ {
 		var f Pol;
@@ -1042,7 +1042,7 @@ public (Pol, error) DerivePolynomial(io.Reader source) {
 	return 0, errors.New("unable to find new random irreducible polynomial");
 }
 
-// GCD computes the Greatest Common Divisor x and f.
+/// GCD computes the Greatest Common Divisor x and f.
 public Pol GCD(/*this*/ Pol x, Pol f) {
 	if f == 0 {
 		return x;
@@ -1059,11 +1059,11 @@ public Pol GCD(/*this*/ Pol x, Pol f) {
 	return f.GCD(x.Mod(f));
 }
 
-// Irreducible returns true iff x is irreducible over F_2. This function
-// uses Ben Or's reducibility test.
+/// Irreducible returns true iff x is irreducible over F_2. This function
+/// uses Ben Or's reducibility test.
 //
-// For details see "Tests and Constructions of Irreducible Polynomials over
-// Finite Fields".
+/// For details see "Tests and Constructions of Irreducible Polynomials over
+/// Finite Fields".
 public bool Irreducible(/*this*/ Pol x, ) {
 	for i := 1; i <= x.Deg()/2; i++ {
 		if x.GCD(qp(uint(i), x)) != 1 {
@@ -1074,7 +1074,7 @@ public bool Irreducible(/*this*/ Pol x, ) {
 	return true;
 }
 
-// MulMod computes x*f mod g
+/// MulMod computes x*f mod g
 public Pol MulMod(/*this*/ Pol x, Pol f, Pol g) {
 	if x == 0 || f == 0 {
 		return 0;
@@ -1094,8 +1094,8 @@ public Pol MulMod(/*this*/ Pol x, Pol f, Pol g) {
 	return res;
 }
 
-// qp computes the polynomial (x^(2^p)-x) mod g. This is needed for the
-// reducibility test.
+/// qp computes the polynomial (x^(2^p)-x) mod g. This is needed for the
+/// reducibility test.
 private Pol qp(uint p, Pol g) {
 	auto num = (1 << p);
 	auto i = 1;
@@ -1113,14 +1113,14 @@ private Pol qp(uint p, Pol g) {
 	return res.Add(2).Mod(g);
 }
 
-// MarshalJSON returns the JSON representation of the Pol.
+/// MarshalJSON returns the JSON representation of the Pol.
 public void MarshalJSON(/*this*/ Pol x, ) (byte[], error) {
 	auto buf = strconv.AppendUint(byte[]{'"'}, uint64(x), 16);
 	buf = append(buf, '"');
 	return buf, nil;
 }
 
-// UnmarshalJSON parses a Pol from the JSON data.
+/// UnmarshalJSON parses a Pol from the JSON data.
 public error UnmarshalJSON(/*this*/ Pol* x, byte[] data) {
 	if len(data) < 2 {
 		return errors.New("invalid string for polynomial");
