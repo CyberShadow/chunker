@@ -247,7 +247,7 @@ private void reset(/*this*/ Chunker* c, ) {
 /// implementation uses a cache in the global variable cache.
 private void fillTables(/*this*/ Chunker* c, ) {
 	// if polynomial hasn't been specified, do not compute anything for now
-	if c.pol == 0 {
+	if (c.pol == 0) {
 		return;
 	}
 
@@ -256,7 +256,7 @@ private void fillTables(/*this*/ Chunker* c, ) {
 	// test if the tables are cached for this polynomial
 	cache.Lock();
 	defer cache.Unlock();
-	if t, ok := cache.entries[c.pol]; ok {
+	if (t, ok := cache.entries[c.pol]; ok) {
 		c.tables = t;
 		return;
 	}
@@ -304,7 +304,7 @@ private void fillTables(/*this*/ Chunker* c, ) {
 /// subsequent calls yield an io.EOF error.
 public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 	data = data[:0];
-	if !c.tablesInitialized {
+	if (!c.tablesInitialized) {
 		return Chunk{}, errors.New("tables for polynomial computation not initialized");
 	}
 
@@ -315,10 +315,10 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 	auto maxSize = c.MaxSize;
 	auto buf = c.buf;
 	for {
-		if c.bpos >= c.bmax {
+		if (c.bpos >= c.bmax) {
 			n, err := io.ReadFull(c.rd, buf[:]);
 
-			if err == io.ErrUnexpectedEOF {
+			if (err == io.ErrUnexpectedEOF) {
 				err = nil;
 			}
 
@@ -327,11 +327,11 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 			// bytes to buffer, so this was the last chunk. If a different
 			// error has occurred, return that error and abandon the current
 			// chunk.
-			if err == io.EOF && !c.closed {
+			if (err == io.EOF && !c.closed) {
 				c.closed = true;
 
 				// return current chunk, if any bytes have been processed
-				if c.count > 0 {
+				if (c.count > 0) {
 					return Chunk{
 						Start:  c.start,
 						Length: c.count,
@@ -341,7 +341,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 				}
 			}
 
-			if err != nil {
+			if (err != nil) {
 				return Chunk{}, err;
 			}
 
@@ -350,9 +350,9 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 		}
 
 		// check if bytes have to be dismissed before starting a new chunk
-		if c.pre > 0 {
+		if (c.pre > 0) {
 			auto n = c.bmax - c.bpos;
-			if c.pre > uint(n) {
+			if (c.pre > uint(n)) {
 				c.pre -= uint(n);
 				data = append(data, buf[c.bpos:c.bmax]...);
 
@@ -381,7 +381,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 			win[wpos] = b;
 			digest ^= ulong(tabout[out]);
 			wpos++;
-			if wpos >= windowSize {
+			if (wpos >= windowSize) {
 				wpos = 0;
 			}
 
@@ -394,11 +394,11 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 			// end manual inline
 
 			add++;
-			if add < minSize {
+			if (add < minSize) {
 				continue;
 			}
 
-			if (digest&c.splitmask) == 0 || add >= maxSize {
+			if ((digest&c.splitmask) == 0 || add >= maxSize) {
 				auto i = add - c.count - 1;
 				data = append(data, c.buf[c.bpos:c.bpos+uint(i)+1]...);
 				c.count = add;
@@ -423,7 +423,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 		c.wpos = wpos;
 
 		auto steps = c.bmax - c.bpos;
-		if steps > 0 {
+		if (steps > 0) {
 			data = append(data, c.buf[c.bpos:c.bpos+steps]...);
 		}
 		c.count += steps;
@@ -463,7 +463,7 @@ module chunker.chunker_test;
 
 private ubyte[] parseDigest(string s) {
 	d, err := hex.DecodeString(s);
-	if err != nil {
+	if (err != nil) {
 		panic(err);
 	}
 
@@ -562,28 +562,28 @@ private Chunk[] testWithData(testing*.T t, Chunker* chnker, chunk[] testChunks, 
 	foreach (i, chunk; testChunks) {
 		c, err := chnker.Next(nil);
 
-		if err != nil {
+		if (err != nil) {
 			t.Fatalf("Error returned with chunk %d: %v", i, err);
 		}
 
-		if c.Start != pos {
+		if (c.Start != pos) {
 			t.Fatalf("Start for chunk %d does not match: expected %d, got %d",
 				i, pos, c.Start);
 		}
 
-		if c.Length != chunk.Length {
+		if (c.Length != chunk.Length) {
 			t.Fatalf("Length for chunk %d does not match: expected %d, got %d",
 				i, chunk.Length, c.Length);
 		}
 
-		if c.Cut != chunk.CutFP {
+		if (c.Cut != chunk.CutFP) {
 			t.Fatalf("Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x",
 				i, len(chunks)-1, chunk.CutFP, c.Cut);
 		}
 
-		if checkDigest {
+		if (checkDigest) {
 			auto digest = hashData(c.Data);
-			if !bytes.Equal(chunk.Digest, digest) {
+			if (!bytes.Equal(chunk.Digest, digest)) {
 				t.Fatalf("Digest fingerprint for chunk %d/%d does not match: expected %02x, got %02x",
 					i, len(chunks)-1, chunk.Digest, digest);
 			}
@@ -594,11 +594,11 @@ private Chunk[] testWithData(testing*.T t, Chunker* chnker, chunk[] testChunks, 
 	}
 
 	_, err := chnker.Next(nil);
-	if err != io.EOF {
+	if (err != io.EOF) {
 		t.Fatal("Wrong error returned after last chunk");
 	}
 
-	if len(chunks) != len(testChunks) {
+	if (len(chunks) != len(testChunks)) {
 		t.Fatal("Amounts of test and resulting chunks do not match");
 	}
 
@@ -664,7 +664,7 @@ func TestChunkerWithRandomPolynomial(testing*.T t) {
 	// generate a new random polynomial
 	auto start = time.Now();
 	p, err := RandomPolynomial();
-	if err != nil {
+	if (err != nil) {
 		t.Fatal(err);
 	}
 	t.Logf("generating random polynomial took %v", time.Since(start));
@@ -675,19 +675,19 @@ func TestChunkerWithRandomPolynomial(testing*.T t) {
 
 	// make sure that first chunk is different
 	c, err := ch.Next(nil);
-	if err != nil {
+	if (err != nil) {
 		t.Fatal(err.Error());
 	}
 
-	if c.Cut == chunks1[0].CutFP {
+	if (c.Cut == chunks1[0].CutFP) {
 		t.Fatal("Cut point is the same");
 	}
 
-	if c.Length == chunks1[0].Length {
+	if (c.Length == chunks1[0].Length) {
 		t.Fatal("Length is the same");
 	}
 
-	if bytes.Equal(hashData(c.Data), chunks1[0].Digest) {
+	if (bytes.Equal(hashData(c.Data), chunks1[0].Digest)) {
 		t.Fatal("Digest is the same");
 	}
 }
@@ -701,12 +701,12 @@ func TestChunkerWithoutHash(testing*.T t) {
 
 	// test reader
 	foreach (i, c; chunks) {
-		if uint(len(c.Data)) != chunks1[i].Length {
+		if (uint(len(c.Data)) != chunks1[i].Length) {
 			t.Fatalf("reader returned wrong number of bytes: expected %d, got %d",
 				chunks1[i].Length, len(c.Data));
 		}
 
-		if !bytes.Equal(buf[c.Start:c.Start+c.Length], c.Data) {
+		if (!bytes.Equal(buf[c.Start:c.Start+c.Length], c.Data)) {
 			t.Fatalf("invalid data for chunk returned: expected %02x, got %02x",
 				buf[c.Start:c.Start+c.Length], c.Data);
 		}
@@ -733,7 +733,7 @@ func benchmarkChunker(testing*.B b, bool checkDigest) {
 		chunks = 0;
 
 		_, err := rd.Seek(0, 0);
-		if err != nil {
+		if (err != nil) {
 			b.Fatalf("Seek() return error %v", err);
 		}
 
@@ -743,27 +743,27 @@ func benchmarkChunker(testing*.B b, bool checkDigest) {
 		for {
 			chunk, err := ch.Next(buf);
 
-			if err == io.EOF {
+			if (err == io.EOF) {
 				break;
 			}
 
-			if err != nil {
+			if (err != nil) {
 				b.Fatalf("Unexpected error occurred: %v", err);
 			}
 
-			if chunk.Length != chunks1[cur].Length {
+			if (chunk.Length != chunks1[cur].Length) {
 				b.Errorf("wrong chunk length, want %d, got %d",
 					chunks1[cur].Length, chunk.Length);
 			}
 
-			if chunk.Cut != chunks1[cur].CutFP {
+			if (chunk.Cut != chunks1[cur].CutFP) {
 				b.Errorf("wrong cut fingerprint, want 0x%x, got 0x%x",
 					chunks1[cur].CutFP, chunk.Cut);
 			}
 
-			if checkDigest {
+			if (checkDigest) {
 				auto h = hashData(chunk.Data);
-				if !bytes.Equal(h, chunks1[cur].Digest) {
+				if (!bytes.Equal(h, chunks1[cur].Digest)) {
 					b.Errorf("wrong digest, want %x, got %x",
 						chunks1[cur].Digest, h);
 				}
@@ -787,7 +787,7 @@ func BenchmarkChunker(testing*.B b) {
 
 func BenchmarkNewChunker(testing*.B b) {
 	p, err := RandomPolynomial();
-	if err != nil {
+	if (err != nil) {
 		b.Fatal(err);
 	}
 
@@ -813,11 +813,11 @@ func ExampleChunker() {
 
 	for (auto i = 0; i < 5; i++) {
 		chunk, err := chunker.Next(buf);
-		if err == io.EOF {
+		if (err == io.EOF) {
 			break;
 		}
 
-		if err != nil {
+		if (err != nil) {
 			panic(err);
 		}
 
@@ -848,12 +848,12 @@ public Pol Add(/*this*/ Pol x, Pol y) {
 /// Code by Rob Pike, see
 /// https://groups.google.com/d/msg/golang-nuts/h5oSN5t3Au4/KaNQREhZh0QJ
 private bool mulOverflows(Pol a, Pol b) {
-	if a <= 1 || b <= 1 {
+	if (a <= 1 || b <= 1) {
 		return false;
 	}
 	auto c = a.mul(b);
 	auto d = c.Div(b);
-	if d != a {
+	if (d != a) {
 		return true;
 	}
 
@@ -861,13 +861,13 @@ private bool mulOverflows(Pol a, Pol b) {
 }
 
 private Pol mul(/*this*/ Pol x, Pol y) {
-	if x == 0 || y == 0 {
+	if (x == 0 || y == 0) {
 		return 0;
 	}
 
 	var res Pol;
 	for (auto i = 0; i <= y.Deg(); i++) {
-		if (y & (1 << uint(i))) > 0 {
+		if ((y & (1 << uint(i))) > 0) {
 			res = res.Add(x << uint(i));
 		}
 	}
@@ -877,7 +877,7 @@ private Pol mul(/*this*/ Pol x, Pol y) {
 
 /// Mul returns x*y. When an overflow occurs, Mul panics.
 public Pol Mul(/*this*/ Pol x, Pol y) {
-	if mulOverflows(x, y) {
+	if (mulOverflows(x, y)) {
 		panic("multiplication would overflow ulong");
 	}
 
@@ -887,39 +887,39 @@ public Pol Mul(/*this*/ Pol x, Pol y) {
 /// Deg returns the degree of the polynomial x. If x is zero, -1 is returned.
 public int Deg(/*this*/ Pol x, ) {
 	// the degree of 0 is -1
-	if x == 0 {
+	if (x == 0) {
 		return -1;
 	}
 
 	// see https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
 
 	auto r = 0;
-	if ulong(x)&0xffffffff00000000 > 0 {
+	if (ulong(x)&0xffffffff00000000 > 0) {
 		x >>= 32;
 		r |= 32;
 	}
 
-	if ulong(x)&0xffff0000 > 0 {
+	if (ulong(x)&0xffff0000 > 0) {
 		x >>= 16;
 		r |= 16;
 	}
 
-	if ulong(x)&0xff00 > 0 {
+	if (ulong(x)&0xff00 > 0) {
 		x >>= 8;
 		r |= 8;
 	}
 
-	if ulong(x)&0xf0 > 0 {
+	if (ulong(x)&0xf0 > 0) {
 		x >>= 4;
 		r |= 4;
 	}
 
-	if ulong(x)&0xc > 0 {
+	if (ulong(x)&0xc > 0) {
 		x >>= 2;
 		r |= 2;
 	}
 
-	if ulong(x)&0x2 > 0 {
+	if (ulong(x)&0x2 > 0) {
 		r |= 1;
 	}
 
@@ -933,22 +933,22 @@ public string String(/*this*/ Pol x, ) {
 
 /// Expand returns the string representation of the polynomial x.
 public string Expand(/*this*/ Pol x, ) {
-	if x == 0 {
+	if (x == 0) {
 		return "0";
 	}
 
 	auto s = "";
 	for (auto i = x.Deg(); i > 1; i--) {
-		if x&(1<<uint(i)) > 0 {
+		if (x&(1<<uint(i)) > 0) {
 			s += fmt.Sprintf("+x^%d", i);
 		}
 	}
 
-	if x&2 > 0 {
+	if (x&2 > 0) {
 		s += "+x";
 	}
 
-	if x&1 > 0 {
+	if (x&1 > 0) {
 		s += "+1";
 	}
 
@@ -958,17 +958,17 @@ public string Expand(/*this*/ Pol x, ) {
 /// DivMod returns x / d = q, and remainder r,
 /// see https://en.wikipedia.org/wiki/Division_algorithm
 public void DivMod(/*this*/ Pol x, Pol d) (Pol, Pol) {
-	if x == 0 {
+	if (x == 0) {
 		return 0, 0;
 	}
 
-	if d == 0 {
+	if (d == 0) {
 		panic("division by zero");
 	}
 
 	auto D = d.Deg();
 	auto diff = x.Deg() - D;
-	if diff < 0 {
+	if (diff < 0) {
 		return 0, x;
 	}
 
@@ -1021,7 +1021,7 @@ public (Pol, error) DerivePolynomial(io.Reader source) {
 
 		// choose polynomial at (pseudo)random
 		auto err = binary.Read(source, binary.LittleEndian, &f);
-		if err != nil {
+		if (err != nil) {
 			return 0, err;
 		}
 
@@ -1033,7 +1033,7 @@ public (Pol, error) DerivePolynomial(io.Reader source) {
 		f |= (1 << 53) | 1;
 
 		// test if f is irreducible
-		if f.Irreducible() {
+		if (f.Irreducible()) {
 			return f, nil;
 		}
 	}
@@ -1045,15 +1045,15 @@ public (Pol, error) DerivePolynomial(io.Reader source) {
 
 /// GCD computes the Greatest Common Divisor x and f.
 public Pol GCD(/*this*/ Pol x, Pol f) {
-	if f == 0 {
+	if (f == 0) {
 		return x;
 	}
 
-	if x == 0 {
+	if (x == 0) {
 		return f;
 	}
 
-	if x.Deg() < f.Deg() {
+	if (x.Deg() < f.Deg()) {
 		x, f = f, x;
 	}
 
@@ -1067,7 +1067,7 @@ public Pol GCD(/*this*/ Pol x, Pol f) {
 /// Finite Fields".
 public bool Irreducible(/*this*/ Pol x, ) {
 	for (auto i = 1; i <= x.Deg()/2; i++) {
-		if x.GCD(qp(uint(i), x)) != 1 {
+		if (x.GCD(qp(uint(i), x)) != 1) {
 			return false;
 		}
 	}
@@ -1077,13 +1077,13 @@ public bool Irreducible(/*this*/ Pol x, ) {
 
 /// MulMod computes x*f mod g
 public Pol MulMod(/*this*/ Pol x, Pol f, Pol g) {
-	if x == 0 || f == 0 {
+	if (x == 0 || f == 0) {
 		return 0;
 	}
 
 	var res Pol;
 	for (auto i = 0; i <= f.Deg(); i++) {
-		if (f & (1 << uint(i))) > 0 {
+		if ((f & (1 << uint(i))) > 0) {
 			auto a = x;
 			for (auto j = 0; j < i; j++) {
 				a = a.Mul(2).Mod(g);
@@ -1123,11 +1123,11 @@ public void MarshalJSON(/*this*/ Pol x, ) (ubyte[], error) {
 
 /// UnmarshalJSON parses a Pol from the JSON data.
 public error UnmarshalJSON(/*this*/ Pol* x, ubyte[] data) {
-	if len(data) < 2 {
+	if (len(data) < 2) {
 		return errors.New("invalid string for polynomial");
 	}
 	n, err := strconv.ParseUint(string(data[1:len(data)-1]), 16, 64);
-	if err != nil {
+	if (err != nil) {
 		return err;
 	}
 	x* = Pol(n);
@@ -1149,11 +1149,11 @@ var polAddTests = struct[] {
 
 func TestPolAdd(testing*.T t) {
 	foreach (i, test; polAddTests) {
-		if test.sum != test.x.Add(test.y) {
+		if (test.sum != test.x.Add(test.y)) {
 			t.Errorf("test %d failed: sum != x+y", i);
 		}
 
-		if test.sum != test.y.Add(test.x) {
+		if (test.sum != test.y.Add(test.x)) {
 			t.Errorf("test %d failed: sum != y+x", i);
 		}
 	}
@@ -1161,7 +1161,7 @@ func TestPolAdd(testing*.T t) {
 
 private Pol parseBin(string s) {
 	i, err := strconv.ParseUint(s, 2, 64);
-	if err != nil {
+	if (err != nil) {
 		panic(err);
 	}
 
@@ -1213,12 +1213,12 @@ var polMulTests = struct[] {
 func TestPolMul(testing*.T t) {
 	foreach (i, test; polMulTests) {
 		auto m = test.x.Mul(test.y);
-		if test.res != m {
+		if (test.res != m) {
 			t.Errorf("TestPolMul failed for test %d: %v * %v: want %v, got %v",
 				i, test.x, test.y, test.res, m);
 		}
 		m = test.y.Mul(test.x);
-		if test.res != test.y.Mul(test.x) {
+		if (test.res != test.y.Mul(test.x)) {
 			t.Errorf("TestPolMul failed for %d: %v * %v: want %v, got %v",
 				i, test.x, test.y, test.res, m);
 		}
@@ -1230,7 +1230,7 @@ func TestPolMulOverflow(testing*.T t) {
 		// try to recover overflow error
 		auto err = recover();
 
-		if e, ok := err.(string); ok && e == "multiplication would overflow ulong" {
+		if (e, ok := err.(string); ok && e == "multiplication would overflow ulong") {
 			return;
 		}
 
@@ -1276,7 +1276,7 @@ var polDivTests = struct[] {
 func TestPolDiv(testing*.T t) {
 	foreach (i, test; polDivTests) {
 		auto m = test.x.Div(test.y);
-		if test.res != m {
+		if (test.res != m) {
 			t.Errorf("TestPolDiv failed for test %d: %v * %v: want %v, got %v",
 				i, test.x, test.y, test.res, m);
 		}
@@ -1285,18 +1285,18 @@ func TestPolDiv(testing*.T t) {
 
 func TestPolDeg(testing*.T t) {
 	var x Pol;
-	if x.Deg() != -1 {
+	if (x.Deg() != -1) {
 		t.Errorf("deg(0) is not -1: %v", x.Deg());
 	}
 
 	x = 1;
-	if x.Deg() != 0 {
+	if (x.Deg() != 0) {
 		t.Errorf("deg(1) is not 0: %v", x.Deg());
 	}
 
 	for (auto i = 0; i < 64; i++) {
 		x = 1 << uint(i);
-		if x.Deg() != i {
+		if (x.Deg() != i) {
 			t.Errorf("deg(1<<%d) is not %d: %v", i, i, x.Deg());
 		}
 	}
@@ -1334,7 +1334,7 @@ var polModTests = struct[] {
 func TestPolModt(testing*.T t) {
 	foreach (i, test; polModTests) {
 		auto res = test.x.Mod(test.y);
-		if test.res != res {
+		if (test.res != res) {
 			t.Errorf("test %d failed: want %v, got %v", i, test.res, res);
 		}
 	}
@@ -1370,7 +1370,7 @@ func BenchmarkPolMod(testing*.B t) {
 func BenchmarkPolDeg(testing*.B t) {
 	auto f = Pol(0x3af4b284899);
 	auto d = f.Deg();
-	if d != 41 {
+	if (d != 41) {
 		t.Fatalf("BenchmalPolDeg: Wrong degree %d returned, expected %d",
 			d, 41);
 	}
@@ -1382,7 +1382,7 @@ func BenchmarkPolDeg(testing*.B t) {
 
 func TestRandomPolynomial(testing*.T t) {
 	_, err := RandomPolynomial();
-	if err != nil {
+	if (err != nil) {
 		t.Fatal(err);
 	}
 }
@@ -1390,7 +1390,7 @@ func TestRandomPolynomial(testing*.T t) {
 func BenchmarkRandomPolynomial(testing*.B t) {
 	for (auto i = 0; i < t.N; i++) {
 		_, err := RandomPolynomial();
-		if err != nil {
+		if (err != nil) {
 			t.Fatal(err);
 		}
 	}
@@ -1399,7 +1399,7 @@ func BenchmarkRandomPolynomial(testing*.B t) {
 func TestExpandPolynomial(testing*.T t) {
 	auto pol = Pol(0x3DA3358B4DC173);
 	auto s = pol.Expand();
-	if s != "x^53+x^52+x^51+x^50+x^48+x^47+x^45+x^41+x^40+x^37+x^36+x^34+x^32+x^31+x^27+x^25+x^24+x^22+x^19+x^18+x^16+x^15+x^14+x^8+x^6+x^5+x^4+x+1" {
+	if (s != "x^53+x^52+x^51+x^50+x^48+x^47+x^45+x^41+x^40+x^37+x^36+x^34+x^32+x^31+x^27+x^25+x^24+x^22+x^19+x^18+x^16+x^15+x^14+x^8+x^6+x^5+x^4+x+1") {
 		t.Fatal("wrong result");
 	}
 }
@@ -1436,7 +1436,7 @@ var polIrredTests = struct[] {
 
 func TestPolIrreducible(testing*.T t) {
 	foreach (_, test; polIrredTests) {
-		if test.f.Irreducible() != test.irred {
+		if (test.f.Irreducible() != test.irred) {
 			t.Errorf("Irreducibility test for Polynomial %v failed: got %v, wanted %v",
 				test.f, test.f.Irreducible(), test.irred);
 		}
@@ -1447,14 +1447,14 @@ func BenchmarkPolIrreducible(testing*.B b) {
 	// find first irreducible polynomial
 	var pol Pol;
 	foreach (_, test; polIrredTests) {
-		if test.irred {
+		if (test.irred) {
 			pol = test.f;
 			break;
 		}
 	}
 
 	for (auto i = 0; i < b.N; i++) {
-		if !pol.Irreducible() {
+		if (!pol.Irreducible()) {
 			b.Errorf("Irreducibility test for Polynomial %v failed", pol);
 		}
 	}
@@ -1513,13 +1513,13 @@ var polGCDTests = struct[] {
 func TestPolGCD(testing*.T t) {
 	foreach (i, test; polGCDTests) {
 		auto gcd = test.f1.GCD(test.f2);
-		if test.gcd != gcd {
+		if (test.gcd != gcd) {
 			t.Errorf("GCD test %d (%+v) failed: got %v, wanted %v",
 				i, test, gcd, test.gcd);
 		}
 
 		gcd = test.f2.GCD(test.f1);
-		if test.gcd != gcd {
+		if (test.gcd != gcd) {
 			t.Errorf("GCD test %d (%+v) failed: got %v, wanted %v",
 				i, test, gcd, test.gcd);
 		}
@@ -1549,7 +1549,7 @@ var polMulModTests = struct[] {
 func TestPolMulMod(testing*.T t) {
 	foreach (i, test; polMulModTests) {
 		auto mod = test.f1.MulMod(test.f2, test.g);
-		if mod != test.mod {
+		if (mod != test.mod) {
 			t.Errorf("MulMod test %d (%+v) failed: got %v, wanted %v",
 				i, test, mod, test.mod);
 		}
