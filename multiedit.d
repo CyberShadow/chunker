@@ -973,7 +973,7 @@ public void DivMod(/*this*/ Pol x, Pol d) (Pol, Pol) {
 	}
 
 	var q Pol;
-	for diff >= 0 {
+	while (diff >= 0) {
 		auto m = d << uint(diff);
 		q |= (1 << uint(diff));
 		x = x.Add(m);
@@ -1104,7 +1104,7 @@ private Pol qp(uint p, Pol g) {
 	// start with x
 	auto res = Pol(2);
 
-	for i < num {
+	while (i < num) {
 		// repeatedly square res
 		res = res.MulMod(res, g);
 		i *= 2;
