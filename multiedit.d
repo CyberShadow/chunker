@@ -113,7 +113,7 @@ static:
 }
 
 func init() {
-	cache.entries = make(map[Pol]tables)
+	cache.entries = make(tables[Pol])
 }
 
 // Chunk is one content-dependent chunk of bytes whose end was cut when the
@@ -123,15 +123,15 @@ public struct Chunk
 	public uint Start;
 	public uint Length;
 	public uint64 Cut;
-	public []byte Data;
+	public byte[] Data;
 }
 
 private struct chunkerState
 {
-	private [windowSize]byte window;
+	private byte[windowSize] window;
 	private int wpos;
 
-	private []byte buf;
+	private byte[] buf;
 	private uint bpos;
 	private uint bmax;
 
@@ -182,7 +182,7 @@ func New(rd io.Reader, pol Pol) *Chunker {
 func NewWithBoundaries(rd io.Reader, pol Pol, min, max uint) *Chunker {
 	c := &Chunker{
 		chunkerState: chunkerState{
-			buf: make([]byte, chunkerBufSize),
+			buf: make(byte[], chunkerBufSize),
 		},
 		chunkerConfig: chunkerConfig{
 			pol:       pol,
@@ -300,7 +300,7 @@ func (c *Chunker) fillTables() {
 // occurs while reading, the error is returned. Afterwards, the state of the
 // current chunk is undefined. When the last chunk has been returned, all
 // subsequent calls yield an io.EOF error.
-func (c *Chunker) Next(data []byte) (Chunk, error) {
+func (c *Chunker) Next(data byte[]) (Chunk, error) {
 	data = data[:0]
 	if !c.tablesInitialized {
 		return Chunk{}, errors.New("tables for polynomial computation not initialized")
@@ -459,7 +459,7 @@ func appendByte(hash Pol, b byte, pol Pol) Pol {
 // ----------------------------------------------------------- chunker_test.d
 module chunker.chunker_test;
 
-func parseDigest(s string) []byte {
+func parseDigest(s string) byte[] {
 	d, err := hex.DecodeString(s)
 	if err != nil {
 		panic(err)
@@ -472,7 +472,7 @@ private struct chunk
 {
 	public uint Length;
 	public uint64 CutFP;
-	public []byte Digest;
+	public byte[] Digest;
 }
 
 // polynomial used for all the tests below
@@ -484,7 +484,7 @@ private enum testPol = Pol(0x3DA3358B4DC173);
 // chunking configuration:
 // window size 64, avg chunksize 1<<20, min chunksize 1<<19, max chunksize 1<<23
 // polynom 0x3DA3358B4DC173
-var chunks1 = []chunk{
+var chunks1 = chunk[]{
 	chunk{2163460, 0x000b98d4cdf00000, parseDigest("4b94cb2cf293855ea43bf766731c74969b91aa6bf3c078719aabdd19860d590d")},
 	chunk{643703, 0x000d4e8364d00000, parseDigest("5727a63c0964f365ab8ed2ccf604912f2ea7be29759a2b53ede4d6841e397407")},
 	chunk{1528956, 0x0015a25c2ef00000, parseDigest("a73759636a1e7a2758767791c69e81b69fb49236c6929e5d1b654e06e37674ba")},
@@ -511,7 +511,7 @@ var chunks1 = []chunk{
 }
 
 // test if nullbytes are correctly split, even if length is a multiple of MinSize.
-var chunks2 = []chunk{
+var chunks2 = chunk[]{
 	chunk{MinSize, 0, parseDigest("07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541")},
 	chunk{MinSize, 0, parseDigest("07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541")},
 	chunk{MinSize, 0, parseDigest("07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541")},
@@ -519,7 +519,7 @@ var chunks2 = []chunk{
 }
 
 // the same as chunks1, but avg chunksize is 1<<19
-var chunks3 = []chunk{
+var chunks3 = chunk[]{
 	chunk{1491586, 0x00023e586ea80000, parseDigest("4c008237df602048039287427171cef568a6cb965d1b5ca28dc80504a24bb061")},
 	chunk{671874, 0x000b98d4cdf00000, parseDigest("fa8a42321b90c3d4ce9dd850562b2fd0c0fe4bdd26cf01a24f22046a224225d3")},
 	chunk{643703, 0x000d4e8364d00000, parseDigest("5727a63c0964f365ab8ed2ccf604912f2ea7be29759a2b53ede4d6841e397407")},
@@ -553,8 +553,8 @@ var chunks3 = []chunk{
 	chunk{237392, 0x0000000000000001, parseDigest("fcd567f5d866357a8e299fd5b2359bb2c8157c30395229c4e9b0a353944a7978")},
 }
 
-func testWithData(t *testing.T, chnker *Chunker, testChunks []chunk, checkDigest bool) []Chunk {
-	chunks := []Chunk{}
+func testWithData(t *testing.T, chnker *Chunker, testChunks chunk[], checkDigest bool) Chunk[] {
+	chunks := Chunk[]{}
 
 	pos := uint(0)
 	for i, chunk := range testChunks {
@@ -603,8 +603,8 @@ func testWithData(t *testing.T, chnker *Chunker, testChunks []chunk, checkDigest
 	return chunks
 }
 
-func getRandom(seed int64, count int) []byte {
-	buf := make([]byte, count)
+func getRandom(seed int64, count int) byte[] {
+	buf := make(byte[], count)
 
 	rnd := rand.New(rand.NewSource(seed))
 	for i := 0; i < count; i += 4 {
@@ -618,7 +618,7 @@ func getRandom(seed int64, count int) []byte {
 	return buf
 }
 
-func hashData(d []byte) []byte {
+func hashData(d byte[]) byte[] {
 	h := sha256.New()
 	h.Write(d)
 	return h.Sum(nil)
@@ -631,7 +631,7 @@ func TestChunker(t *testing.T) {
 	testWithData(t, ch, chunks1, true)
 
 	// setup nullbyte data source
-	buf = bytes.Repeat([]byte{0}, len(chunks2)*MinSize)
+	buf = bytes.Repeat(byte[]{0}, len(chunks2)*MinSize)
 	ch = New(bytes.NewReader(buf), testPol)
 
 	testWithData(t, ch, chunks2, true)
@@ -711,7 +711,7 @@ func TestChunkerWithoutHash(t *testing.T) {
 	}
 
 	// setup nullbyte data source
-	buf = bytes.Repeat([]byte{0}, len(chunks2)*MinSize)
+	buf = bytes.Repeat(byte[]{0}, len(chunks2)*MinSize)
 	ch = New(bytes.NewReader(buf), testPol)
 
 	testWithData(t, ch, chunks2, false)
@@ -721,7 +721,7 @@ func benchmarkChunker(b *testing.B, checkDigest bool) {
 	size := 32 * 1024 * 1024
 	rd := bytes.NewReader(getRandom(23, size))
 	ch := New(rd, testPol)
-	buf := make([]byte, MaxSize)
+	buf := make(byte[], MaxSize)
 
 	b.ResetTimer()
 	b.SetBytes(int64(size))
@@ -807,7 +807,7 @@ func ExampleChunker() {
 	chunker := New(bytes.NewReader(data), Pol(0x3DA3358B4DC173))
 
 	// reuse this buffer
-	buf := make([]byte, 8*1024*1024)
+	buf := make(byte[], 8*1024*1024)
 
 	for i := 0; i < 5; i++ {
 		chunk, err := chunker.Next(buf)
@@ -1113,14 +1113,14 @@ func qp(p uint, g Pol) Pol {
 }
 
 // MarshalJSON returns the JSON representation of the Pol.
-func (x Pol) MarshalJSON() ([]byte, error) {
-	buf := strconv.AppendUint([]byte{'"'}, uint64(x), 16)
+func (x Pol) MarshalJSON() (byte[], error) {
+	buf := strconv.AppendUint(byte[]{'"'}, uint64(x), 16)
 	buf = append(buf, '"')
 	return buf, nil
 }
 
 // UnmarshalJSON parses a Pol from the JSON data.
-func (x *Pol) UnmarshalJSON(data []byte) error {
+func (x *Pol) UnmarshalJSON(data byte[]) error {
 	if len(data) < 2 {
 		return errors.New("invalid string for polynomial")
 	}
@@ -1136,7 +1136,7 @@ func (x *Pol) UnmarshalJSON(data []byte) error {
 // ----------------------------------------------------------- polynomials_test.d
 module chunker.polynomials_test;
 
-var polAddTests = []struct {
+var polAddTests = struct[] {
 	private Pol x, y;
 	private Pol sum;
 }{
@@ -1166,7 +1166,7 @@ func parseBin(s string) Pol {
 	return Pol(i)
 }
 
-var polMulTests = []struct {
+var polMulTests = struct[] {
 	private Pol x, y;
 	private Pol res;
 }{
@@ -1242,7 +1242,7 @@ func TestPolMulOverflow(t *testing.T) {
 	t.Fatal("overflow test did not panic")
 }
 
-var polDivTests = []struct {
+var polDivTests = struct[] {
 	private Pol x, y;
 	private Pol res;
 }{
@@ -1300,7 +1300,7 @@ func TestPolDeg(t *testing.T) {
 	}
 }
 
-var polModTests = []struct {
+var polModTests = struct[] {
 	private Pol x, y;
 	private Pol res;
 }{
@@ -1402,7 +1402,7 @@ func TestExpandPolynomial(t *testing.T) {
 	}
 }
 
-var polIrredTests = []struct {
+var polIrredTests = struct[] {
 	private Pol f;
 	private bool irred;
 }{
@@ -1458,7 +1458,7 @@ func BenchmarkPolIrreducible(b *testing.B) {
 	}
 }
 
-var polGCDTests = []struct {
+var polGCDTests = struct[] {
 	private Pol f1;
 	private Pol f2;
 	private Pol gcd;
@@ -1524,7 +1524,7 @@ func TestPolGCD(t *testing.T) {
 	}
 }
 
-var polMulModTests = []struct {
+var polMulModTests = struct[] {
 	private Pol f1;
 	private Pol f2;
 	private Pol g;
