@@ -183,7 +183,7 @@ public Chunker* New(io.Reader rd, Pol pol) {
 public Chunker* NewWithBoundaries(io.Reader rd, Pol pol, uint min, uint max) {
 	auto c = &Chunker{
 		chunkerState: chunkerState{
-			buf: new ubyte[](chunkerBufSize),
+			buf: new ubyte[chunkerBufSize],
 		},
 		chunkerConfig: chunkerConfig{
 			pol:       pol,
@@ -605,7 +605,7 @@ private Chunk[] testWithData(testing*.T t, Chunker* chnker, chunk[] testChunks, 
 }
 
 private ubyte[] getRandom(long seed, int count) {
-	auto buf = new ubyte[](count);
+	auto buf = new ubyte[count];
 
 	auto rnd = rand.New(rand.NewSource(seed));
 	for i := 0; i < count; i += 4 {
@@ -722,7 +722,7 @@ func benchmarkChunker(testing*.B b, bool checkDigest) {
 	auto size = 32 * 1024 * 1024;
 	auto rd = bytes.NewReader(getRandom(23, size));
 	auto ch = New(rd, testPol);
-	auto buf = new ubyte[](MaxSize);
+	auto buf = new ubyte[MaxSize];
 
 	b.ResetTimer();
 	b.SetBytes(long(size));
@@ -808,7 +808,7 @@ func ExampleChunker() {
 	auto chunker = New(bytes.NewReader(data), Pol(0x3DA3358B4DC173));
 
 	// reuse this buffer
-	auto buf = new ubyte[](8*1024*1024);
+	auto buf = new ubyte[8*1024*1024];
 
 	for i := 0; i < 5; i++ {
 		chunk, err := chunker.Next(buf);
