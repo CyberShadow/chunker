@@ -375,7 +375,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 		auto digest = c.digest;
 		auto win = c.window;
 		auto wpos = c.wpos;
-		for _, b := range buf[c.bpos:c.bmax] {
+		foreach (_, b; range buf[c.bpos:c.bmax]) {
 			// slide(b)
 			auto out = win[wpos];
 			win[wpos] = b;
@@ -559,7 +559,7 @@ private Chunk[] testWithData(testing*.T t, Chunker* chnker, chunk[] testChunks, 
 	auto chunks = Chunk[]{};
 
 	auto pos = uint(0);
-	for i, chunk := range testChunks {
+	foreach (i, chunk; range testChunks) {
 		c, err := chnker.Next(nil);
 
 		if err != nil {
@@ -700,7 +700,7 @@ func TestChunkerWithoutHash(testing*.T t) {
 	auto chunks = testWithData(t, ch, chunks1, false);
 
 	// test reader
-	for i, c := range chunks {
+	foreach (i, c; range chunks) {
 		if uint(len(c.Data)) != chunks1[i].Length {
 			t.Fatalf("reader returned wrong number of bytes: expected %d, got %d",
 				chunks1[i].Length, len(c.Data));
@@ -1148,7 +1148,7 @@ var polAddTests = struct[] {
 }
 
 func TestPolAdd(testing*.T t) {
-	for i, test := range polAddTests {
+	foreach (i, test; range polAddTests) {
 		if test.sum != test.x.Add(test.y) {
 			t.Errorf("test %d failed: sum != x+y", i);
 		}
@@ -1211,7 +1211,7 @@ var polMulTests = struct[] {
 }
 
 func TestPolMul(testing*.T t) {
-	for i, test := range polMulTests {
+	foreach (i, test; range polMulTests) {
 		auto m = test.x.Mul(test.y);
 		if test.res != m {
 			t.Errorf("TestPolMul failed for test %d: %v * %v: want %v, got %v",
@@ -1274,7 +1274,7 @@ var polDivTests = struct[] {
 }
 
 func TestPolDiv(testing*.T t) {
-	for i, test := range polDivTests {
+	foreach (i, test; range polDivTests) {
 		auto m = test.x.Div(test.y);
 		if test.res != m {
 			t.Errorf("TestPolDiv failed for test %d: %v * %v: want %v, got %v",
@@ -1332,7 +1332,7 @@ var polModTests = struct[] {
 }
 
 func TestPolModt(testing*.T t) {
-	for i, test := range polModTests {
+	foreach (i, test; range polModTests) {
 		auto res = test.x.Mod(test.y);
 		if test.res != res {
 			t.Errorf("test %d failed: want %v, got %v", i, test.res, res);
@@ -1435,7 +1435,7 @@ var polIrredTests = struct[] {
 }
 
 func TestPolIrreducible(testing*.T t) {
-	for _, test := range polIrredTests {
+	foreach (_, test; range polIrredTests) {
 		if test.f.Irreducible() != test.irred {
 			t.Errorf("Irreducibility test for Polynomial %v failed: got %v, wanted %v",
 				test.f, test.f.Irreducible(), test.irred);
@@ -1446,7 +1446,7 @@ func TestPolIrreducible(testing*.T t) {
 func BenchmarkPolIrreducible(testing*.B b) {
 	// find first irreducible polynomial
 	var pol Pol;
-	for _, test := range polIrredTests {
+	foreach (_, test; range polIrredTests) {
 		if test.irred {
 			pol = test.f;
 			break;
@@ -1511,7 +1511,7 @@ var polGCDTests = struct[] {
 }
 
 func TestPolGCD(testing*.T t) {
-	for i, test := range polGCDTests {
+	foreach (i, test; range polGCDTests) {
 		auto gcd = test.f1.GCD(test.f2);
 		if test.gcd != gcd {
 			t.Errorf("GCD test %d (%+v) failed: got %v, wanted %v",
@@ -1547,7 +1547,7 @@ var polMulModTests = struct[] {
 }
 
 func TestPolMulMod(testing*.T t) {
-	for i, test := range polMulModTests {
+	foreach (i, test; range polMulModTests) {
 		auto mod = test.f1.MulMod(test.f2, test.g);
 		if mod != test.mod {
 			t.Errorf("MulMod test %d (%+v) failed: got %v, wanted %v",
