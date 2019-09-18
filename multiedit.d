@@ -112,8 +112,9 @@ static:
 	Object mutex;
 }
 
-func init() {
-	cache.entries = make(tables[Pol])
+static this()
+{
+	cache.mutex = new Object;
 }
 
 // Chunk is one content-dependent chunk of bytes whose end was cut when the
