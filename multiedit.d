@@ -84,20 +84,19 @@ license that can be found in the LICENSE file.
 
 module chunker;
 
-const (
-	kiB = 1024
-	miB = 1024 * kiB
+private enum kiB = 1024;
+private enum miB = 1024 * kiB;
 
-	// WindowSize is the size of the sliding window.
-	windowSize = 64
+/// WindowSize is the size of the sliding window.
+private enum windowSize = 64;
 
-	// MinSize is the default minimal size of a chunk.
-	MinSize = 512 * kiB
-	// MaxSize is the default maximal size of a chunk.
-	MaxSize = 8 * miB
+/// MinSize is the default minimal size of a chunk.
+public enum MinSize = 512 * kiB;
+/// MaxSize is the default maximal size of a chunk.
+public enum MaxSize = 8 * miB;
 
-	chunkerBufSize = 512 * kiB
-)
+private enum chunkerBufSize = 512 * kiB;
+
 
 type tables struct {
 	out [256]Pol
@@ -469,7 +468,7 @@ type chunk struct {
 }
 
 // polynomial used for all the tests below
-const testPol = Pol(0x3DA3358B4DC173)
+private enum testPol = Pol(0x3DA3358B4DC173);
 
 // created for 32MB of random data out of math/rand's Uint32() seeded by
 // constant 23
@@ -991,7 +990,7 @@ func (x Pol) Mod(d Pol) Pol {
 // really large upper bound for finding a new irreducible polynomial, and
 // return an error when no irreducible polynomial has been found within
 // randPolMaxTries.
-const randPolMaxTries = 1e6
+private enum randPolMaxTries = 1e6;
 
 // RandomPolynomial returns a new random irreducible polynomial
 // of degree 53 using the default System CSPRNG as source.
