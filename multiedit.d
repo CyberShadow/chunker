@@ -228,7 +228,7 @@ private void reset(/*this*/ Chunker* c, ) {
 	c.polShift = uint(c.pol.Deg() - 8);
 	c.fillTables();
 
-	for i := 0; i < windowSize; i++ {
+	for (auto i = 0; i < windowSize; i++) {
 		c.window[i] = 0;
 	}
 
@@ -272,11 +272,11 @@ private void fillTables(/*this*/ Chunker* c, ) {
 	//  = H(    0     || b_1 || ...     || b_w)
 	//
 	// Afterwards a new byte can be shifted in.
-	for b := 0; b < 256; b++ {
+	for (auto b = 0; b < 256; b++) {
 		var h Pol;
 
 		h = appendByte(h, ubyte(b), c.pol);
-		for i := 0; i < windowSize-1; i++ {
+		for (auto i = 0; i < windowSize-1; i++) {
 			h = appendByte(h, 0, c.pol);
 		}
 		c.tables.out[b] = h;
@@ -284,7 +284,7 @@ private void fillTables(/*this*/ Chunker* c, ) {
 
 	// calculate table for reduction mod Polynomial
 	auto k = c.pol.Deg();
-	for b := 0; b < 256; b++ {
+	for (auto b = 0; b < 256; b++) {
 		// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
 		//
 		// The 8 bits above deg(Polynomial) determine what happens next and so
@@ -609,7 +609,7 @@ private ubyte[] getRandom(long seed, int count) {
 	auto buf = new ubyte[count];
 
 	auto rnd = rand.New(rand.NewSource(seed));
-	for i := 0; i < count; i += 4 {
+	for (auto i = 0; i < count; i += 4) {
 		auto r = rnd.Uint32();
 		buf[i] = ubyte(r);
 		buf[i+1] = ubyte(r >> 8);
@@ -729,7 +729,7 @@ func benchmarkChunker(testing*.B b, bool checkDigest) {
 	b.SetBytes(long(size));
 
 	var chunks int;
-	for i := 0; i < b.N; i++ {
+	for (auto i = 0; i < b.N; i++) {
 		chunks = 0;
 
 		_, err := rd.Seek(0, 0);
@@ -793,7 +793,7 @@ func BenchmarkNewChunker(testing*.B b) {
 
 	b.ResetTimer();
 
-	for i := 0; i < b.N; i++ {
+	for (auto i = 0; i < b.N; i++) {
 		New(bytes.NewBuffer(nil), p);
 	}
 }
@@ -811,7 +811,7 @@ func ExampleChunker() {
 	// reuse this buffer
 	auto buf = new ubyte[8*1024*1024];
 
-	for i := 0; i < 5; i++ {
+	for (auto i = 0; i < 5; i++) {
 		chunk, err := chunker.Next(buf);
 		if err == io.EOF {
 			break;
@@ -866,7 +866,7 @@ private Pol mul(/*this*/ Pol x, Pol y) {
 	}
 
 	var res Pol;
-	for i := 0; i <= y.Deg(); i++ {
+	for (auto i = 0; i <= y.Deg(); i++) {
 		if (y & (1 << uint(i))) > 0 {
 			res = res.Add(x << uint(i));
 		}
@@ -938,7 +938,7 @@ public string Expand(/*this*/ Pol x, ) {
 	}
 
 	auto s = "";
-	for i := x.Deg(); i > 1; i-- {
+	for (auto i = x.Deg(); i > 1; i--) {
 		if x&(1<<uint(i)) > 0 {
 			s += fmt.Sprintf("+x^%d", i);
 		}
@@ -1016,7 +1016,7 @@ public (Pol, error) RandomPolynomial() {
 /// Polynomials", page 4. If no polynomial could be found in one
 /// million tries, an error is returned.
 public (Pol, error) DerivePolynomial(io.Reader source) {
-	for i := 0; i < randPolMaxTries; i++ {
+	for (auto i = 0; i < randPolMaxTries; i++) {
 		var f Pol;
 
 		// choose polynomial at (pseudo)random
@@ -1066,7 +1066,7 @@ public Pol GCD(/*this*/ Pol x, Pol f) {
 /// For details see "Tests and Constructions of Irreducible Polynomials over
 /// Finite Fields".
 public bool Irreducible(/*this*/ Pol x, ) {
-	for i := 1; i <= x.Deg()/2; i++ {
+	for (auto i = 1; i <= x.Deg()/2; i++) {
 		if x.GCD(qp(uint(i), x)) != 1 {
 			return false;
 		}
@@ -1082,10 +1082,10 @@ public Pol MulMod(/*this*/ Pol x, Pol f, Pol g) {
 	}
 
 	var res Pol;
-	for i := 0; i <= f.Deg(); i++ {
+	for (auto i = 0; i <= f.Deg(); i++) {
 		if (f & (1 << uint(i))) > 0 {
 			auto a = x;
-			for j := 0; j < i; j++ {
+			for (auto j = 0; j < i; j++) {
 				a = a.Mul(2).Mod(g);
 			}
 			res = res.Add(a).Mod(g);
@@ -1294,7 +1294,7 @@ func TestPolDeg(testing*.T t) {
 		t.Errorf("deg(1) is not 0: %v", x.Deg());
 	}
 
-	for i := 0; i < 64; i++ {
+	for (auto i = 0; i < 64; i++) {
 		x = 1 << uint(i);
 		if x.Deg() != i {
 			t.Errorf("deg(1<<%d) is not %d: %v", i, i, x.Deg());
@@ -1344,7 +1344,7 @@ func BenchmarkPolDivMod(testing*.B t) {
 	auto f = Pol(0x2482734cacca49);
 	auto g = Pol(0x3af4b284899);
 
-	for i := 0; i < t.N; i++ {
+	for (auto i = 0; i < t.N; i++) {
 		g.DivMod(f);
 	}
 }
@@ -1353,7 +1353,7 @@ func BenchmarkPolDiv(testing*.B t) {
 	auto f = Pol(0x2482734cacca49);
 	auto g = Pol(0x3af4b284899);
 
-	for i := 0; i < t.N; i++ {
+	for (auto i = 0; i < t.N; i++) {
 		g.Div(f);
 	}
 }
@@ -1362,7 +1362,7 @@ func BenchmarkPolMod(testing*.B t) {
 	auto f = Pol(0x2482734cacca49);
 	auto g = Pol(0x3af4b284899);
 
-	for i := 0; i < t.N; i++ {
+	for (auto i = 0; i < t.N; i++) {
 		g.Mod(f);
 	}
 }
@@ -1375,7 +1375,7 @@ func BenchmarkPolDeg(testing*.B t) {
 			d, 41);
 	}
 
-	for i := 0; i < t.N; i++ {
+	for (auto i = 0; i < t.N; i++) {
 		f.Deg();
 	}
 }
@@ -1388,7 +1388,7 @@ func TestRandomPolynomial(testing*.T t) {
 }
 
 func BenchmarkRandomPolynomial(testing*.B t) {
-	for i := 0; i < t.N; i++ {
+	for (auto i = 0; i < t.N; i++) {
 		_, err := RandomPolynomial();
 		if err != nil {
 			t.Fatal(err);
@@ -1453,7 +1453,7 @@ func BenchmarkPolIrreducible(testing*.B b) {
 		}
 	}
 
-	for i := 0; i < b.N; i++ {
+	for (auto i = 0; i < b.N; i++) {
 		if !pol.Irreducible() {
 			b.Errorf("Irreducibility test for Polynomial %v failed", pol);
 		}
