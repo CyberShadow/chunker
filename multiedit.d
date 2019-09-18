@@ -100,14 +100,16 @@ private enum chunkerBufSize = 512 * kiB;
 
 private struct tables
 {
-	out [256]Pol
-	mod [256]Pol
+	private Pol[256] out;
+	private Pol[256] mod;
 }
 
 // cache precomputed tables, these are read-only anyway
-var cache struct {
-	entries map[Pol]tables
-	sync.Mutex
+private struct cache
+{
+static:
+	tables[Pol] entries;
+	Object mutex;
 }
 
 func init() {
@@ -118,49 +120,49 @@ func init() {
 // Rabin Fingerprint had the value stored in Cut.
 public struct Chunk
 {
-	Start  uint
-	Length uint
-	Cut    uint64
-	Data   []byte
+	public uint Start;
+	public uint Length;
+	public uint64 Cut;
+	public []byte Data;
 }
 
 private struct chunkerState
 {
-	window [windowSize]byte
-	wpos   int
+	private [windowSize]byte window;
+	private int wpos;
 
-	buf  []byte
-	bpos uint
-	bmax uint
+	private []byte buf;
+	private uint bpos;
+	private uint bmax;
 
-	start uint
-	count uint
-	pos   uint
+	private uint start;
+	private uint count;
+	private uint pos;
 
-	pre uint // wait for this many bytes before start calculating an new chunk
+	private uint pre; // wait for this many bytes before start calculating an new chunk
 
-	digest uint64
+	private uint64 digest;
 }
 
 private struct chunkerConfig
 {
-	MinSize, MaxSize uint
+	public uint MinSize, MaxSize;
 
-	pol               Pol
-	polShift          uint
-	tables            tables
-	tablesInitialized bool
-	splitmask         uint64
+	private Pol pol;
+	private uint polShift;
+	private tables tables;
+	private bool tablesInitialized;
+	private uint64 splitmask;
 
-	rd     io.Reader
-	closed bool
+	private io.Reader rd;
+	private bool closed;
 }
 
 // Chunker splits content with Rabin Fingerprints.
 public struct Chunker
 {
-	chunkerConfig
-	chunkerState
+	chunkerConfig chunkerConfig;
+	chunkerState chunkerState;
 }
 
 // SetAverageBits allows to control the frequency of chunk discovery:
@@ -468,9 +470,9 @@ func parseDigest(s string) []byte {
 
 private struct chunk
 {
-	Length uint
-	CutFP  uint64
-	Digest []byte
+	public uint Length;
+	public uint64 CutFP;
+	public []byte Digest;
 }
 
 // polynomial used for all the tests below
@@ -1135,8 +1137,8 @@ func (x *Pol) UnmarshalJSON(data []byte) error {
 module chunker.polynomials_test;
 
 var polAddTests = []struct {
-	x, y Pol
-	sum  Pol
+	private Pol x, y;
+	private Pol sum;
 }{
 	{23, 16, 23 ^ 16},
 	{0x9a7e30d1e855e0a0, 0x670102a1f4bcd414, 0xfd7f32701ce934b4},
@@ -1165,8 +1167,8 @@ func parseBin(s string) Pol {
 }
 
 var polMulTests = []struct {
-	x, y Pol
-	res  Pol
+	private Pol x, y;
+	private Pol res;
 }{
 	{1, 2, 2},
 	{
@@ -1241,8 +1243,8 @@ func TestPolMulOverflow(t *testing.T) {
 }
 
 var polDivTests = []struct {
-	x, y Pol
-	res  Pol
+	private Pol x, y;
+	private Pol res;
 }{
 	{10, 50, 0},
 	{0, 1, 0},
@@ -1299,8 +1301,8 @@ func TestPolDeg(t *testing.T) {
 }
 
 var polModTests = []struct {
-	x, y Pol
-	res  Pol
+	private Pol x, y;
+	private Pol res;
 }{
 	{10, 50, 10},
 	{0, 1, 0},
@@ -1401,8 +1403,8 @@ func TestExpandPolynomial(t *testing.T) {
 }
 
 var polIrredTests = []struct {
-	f     Pol
-	irred bool
+	private Pol f;
+	private bool irred;
 }{
 	{0x38f1e565e288df, false},
 	{0x3DA3358B4DC173, true},
@@ -1457,9 +1459,9 @@ func BenchmarkPolIrreducible(b *testing.B) {
 }
 
 var polGCDTests = []struct {
-	f1  Pol
-	f2  Pol
-	gcd Pol
+	private Pol f1;
+	private Pol f2;
+	private Pol gcd;
 }{
 	{10, 50, 2},
 	{0, 1, 1},
@@ -1523,10 +1525,10 @@ func TestPolGCD(t *testing.T) {
 }
 
 var polMulModTests = []struct {
-	f1  Pol
-	f2  Pol
-	g   Pol
-	mod Pol
+	private Pol f1;
+	private Pol f2;
+	private Pol g;
+	private Pol mod;
 }{
 	{
 		0x1230,
