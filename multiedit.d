@@ -100,7 +100,7 @@ private enum chunkerBufSize = 512 * kiB;
 
 private struct tables
 {
-	private Pol[256] out;
+	private Pol[256] out_;
 	private Pol[256] mod;
 }
 
@@ -279,7 +279,7 @@ private void fillTables(/*this*/ Chunker* c) {
 			for (auto i = 0; i < windowSize-1; i++) {
 				h = appendByte(h, 0, c.pol);
 			}
-			c.tables.out[b] = h;
+			c.tables.out_[b] = h;
 		}
 
 		// calculate table for reduction mod Polynomial
@@ -309,7 +309,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 		return Chunk{}, errors.New("tables for polynomial computation not initialized");
 	}
 
-	auto tabout = c.tables.out;
+	auto tabout = c.tables.out_;
 	auto tabmod = c.tables.mod;
 	auto polShift = c.polShift;
 	auto minSize = c.MinSize;
@@ -378,9 +378,9 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 		auto wpos = c.wpos;
 		foreach (_, b; buf[c.bpos:c.bmax]) {
 			// slide(b)
-			auto out = win[wpos];
+			auto out_ = win[wpos];
 			win[wpos] = b;
-			digest ^= ulong(tabout[out]);
+			digest ^= ulong(tabout[out_]);
 			wpos++;
 			if (wpos >= windowSize) {
 				wpos = 0;
@@ -443,9 +443,9 @@ private (ulong newDigest) updateDigest(ulong digest, uint polShift, tables tab, 
 }
 
 private void slide(/*this*/ Chunker* c, ulong digest, ubyte b) (ulong newDigest) {
-	auto out = c.window[c.wpos];
+	auto out_ = c.window[c.wpos];
 	c.window[c.wpos] = b;
-	digest ^= ulong(c.tables.out[out]);
+	digest ^= ulong(c.tables.out_[out_]);
 	c.wpos = (c.wpos + 1) % windowSize;
 
 	digest = updateDigest(digest, c.polShift, c.tables, b);
