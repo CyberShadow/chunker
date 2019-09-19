@@ -401,10 +401,10 @@ struct Chunker(R)
 
 				if ((digest&config.splitmask) == 0 || add >= maxSize)
 				{
-					auto i = add - state.count - 1;
-					data ~= state.buf[state.bpos .. state.bpos+i+1];
-					state.pos += i + 1;
-					state.bpos += i + 1;
+					auto i = add - state.count;
+					data ~= state.buf[state.bpos .. state.bpos+i];
+					state.pos += i;
+					state.bpos += i;
 					state.buf = buf;
 
 					auto chunk = Chunk
