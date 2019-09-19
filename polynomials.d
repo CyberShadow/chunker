@@ -599,7 +599,7 @@ struct Pol
 	//
 	/// For details see "Tests and Constructions of Irreducible Polynomials over
 	/// Finite Fields".
-	@property public bool irreducible()
+	@property public bool irreducible() const
 	{
 		for (auto i = 1; i <= this.deg/2; i++)
 			if (gcd(this, qp(uint(i), this)).value != 1)
@@ -719,7 +719,7 @@ struct Pol
 
 	/// qp computes the polynomial (x^(2^p)-x) mod g. This is needed for the
 	/// reducibility test.
-	private Pol qp(uint p, Pol g)
+	static private Pol qp(uint p, Pol g)
 	{
 		auto num = (1L << p);
 		auto i = 1;
