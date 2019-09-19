@@ -355,7 +355,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 			auto n = c.bmax - c.bpos;
 			if (c.pre > uint(n)) {
 				c.pre -= uint(n);
-				data = append(data, buf[c.bpos .. c.bmax]...);
+				data ~= buf[c.bpos .. c.bmax];
 
 				c.count += uint(n);
 				c.pos += uint(n);
@@ -364,7 +364,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 				continue;
 			}
 
-			data = append(data, buf[c.bpos .. c.bpos+c.pre]...);
+			data ~= buf[c.bpos .. c.bpos+c.pre];
 
 			c.bpos += c.pre;
 			c.count += c.pre;
@@ -401,7 +401,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 
 			if ((digest&c.splitmask) == 0 || add >= maxSize) {
 				auto i = add - c.count - 1;
-				data = append(data, c.buf[c.bpos .. c.bpos+uint(i)+1]...);
+				data ~= c.buf[c.bpos .. c.bpos+uint(i)+1];
 				c.count = add;
 				c.pos += uint(i) + 1;
 				c.bpos += uint(i) + 1;
@@ -425,7 +425,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 
 		auto steps = c.bmax - c.bpos;
 		if (steps > 0) {
-			data = append(data, c.buf[c.bpos .. c.bpos+steps]...);
+			data ~= c.buf[c.bpos .. c.bpos+steps];
 		}
 		c.count += steps;
 		c.pos += steps;
@@ -591,7 +591,7 @@ private Chunk[] testWithData(testing*.T t, Chunker* chnker, chunk[] testChunks, 
 		}
 
 		pos += c.Length;
-		chunks = append(chunks, c);
+		chunks ~= c;
 	}
 
 	_, err := chnker.Next(nil);
@@ -1118,7 +1118,7 @@ private Pol qp(uint p, Pol g) {
 /// MarshalJSON returns the JSON representation of the Pol.
 public void MarshalJSON(/*this*/ Pol x) (ubyte[], error) {
 	auto buf = strconv.AppendUint(ubyte[]{'"'}, ulong(x), 16);
-	buf = append(buf, '"');
+	buf ~= '"';
 	return buf, nil;
 }
 
