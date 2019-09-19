@@ -744,7 +744,7 @@ struct Pol
 
 version (benchmarkPolynomials)
 {
-	import chunker.benchmark;
+	import chunker.internal.benchmark;
 	mixin BenchmarkThisModule;
 
 	static foreach (name; __traits(allMembers, Pol))

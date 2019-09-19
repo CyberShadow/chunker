@@ -458,7 +458,7 @@ private Pol appendByte(Pol hash, ubyte b, Pol pol)
 // -----------------------------------------------------------------------------
 package: // shared with example
 
-private import chunker.gorng;
+private import chunker.internal.gorng;
 
 package ubyte[] getRandom(int seed, int count)
 {
@@ -733,7 +733,7 @@ import std.stdio : stderr;
 
 version (benchmarkChunker)
 {
-	import chunker.benchmark;
+	import chunker.internal.benchmark;
 	mixin BenchmarkThisModule;
 
 	void _benchmarkChunker(bool checkDigest)

@@ -1,10 +1,10 @@
 /// A minimal benchmarking harness.
-module chunker.benchmark;
+module chunker.internal.benchmark;
 
 /**
  * To make a module benchmarkable, add:
  * ---
- * version (benchmarkYourModule) { import chunker.benchmark; mixin BenchmarkThisModule; }
+ * version (benchmarkYourModule) { import chunker.internal.benchmark; mixin BenchmarkThisModule; }
  * ---
  *
  * Then, declare benchmarks by declaring private functions with a name
