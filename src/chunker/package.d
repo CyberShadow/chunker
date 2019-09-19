@@ -90,16 +90,16 @@ module chunker;
 
 import chunker.polynomials;
 
-private enum kiB = 1024;
-private enum miB = 1024 * kiB;
+private enum size_t kiB = 1024;
+private enum size_t miB = 1024 * kiB;
 
 /// Size of the sliding window.
-private enum windowSize = 64;
+private enum size_t windowSize = 64;
 
 /// Default minimal size of a chunk.
-public enum minSize = 512 * kiB;
+public enum size_t minSize = 512 * kiB;
 /// Default maximal size of a chunk.
-public enum maxSize = 8 * miB;
+public enum size_t maxSize = 8 * miB;
 
 private enum chunkerBufSize = 512 * kiB;
 
@@ -130,8 +130,8 @@ struct Chunker(R)
 	/// the Rabin Fingerprint had the value stored in `cut`.
 	public struct Chunk
 	{
-		public uint start;
-		public uint length;
+		public size_t start;
+		public size_t length;
 		public ulong cut;
 		public ubyte[] data;
 	}
@@ -139,17 +139,17 @@ struct Chunker(R)
 	private struct State
 	{
 		private ubyte[windowSize] window;
-		private int wpos;
+		private size_t wpos;
 
 		private ubyte[] buf;
-		private uint bpos;
-		private uint bmax;
+		private size_t bpos;
+		private size_t bmax;
 
-		private uint start;
-		private uint count;
-		private uint pos;
+		private size_t start;
+		private size_t count;
+		private size_t pos;
 
-		private uint pre; /// wait for this many bytes before start calculating an new chunk
+		private size_t pre; /// wait for this many bytes before start calculating an new chunk
 
 		private ulong digest;
 	}
@@ -344,13 +344,13 @@ struct Chunker(R)
 			if (state.pre > 0)
 			{
 				auto n = state.bmax - state.bpos;
-				if (state.pre > uint(n))
+				if (state.pre > n)
 				{
-					state.pre -= uint(n);
+					state.pre -= n;
 					data ~= buf[state.bpos .. state.bmax];
 
-					state.count += uint(n);
-					state.pos += uint(n);
+					state.count += n;
+					state.pos += n;
 					state.bpos = state.bmax;
 
 					continue;
@@ -393,10 +393,10 @@ struct Chunker(R)
 				if ((digest&config.splitmask) == 0 || add >= maxSize)
 				{
 					auto i = add - state.count - 1;
-					data ~= state.buf[state.bpos .. state.bpos+uint(i)+1];
+					data ~= state.buf[state.bpos .. state.bpos+i+1];
 					state.count = add;
-					state.pos += uint(i) + 1;
-					state.bpos += uint(i) + 1;
+					state.pos += i + 1;
+					state.bpos += i + 1;
 					state.buf = buf;
 
 					auto chunk = Chunk
