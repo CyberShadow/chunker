@@ -224,7 +224,7 @@ public void ResetWithBoundaries(/*this*/ Chunker* c, io.Reader rd, Pol pol, uint
 	c.reset();
 }
 
-private void reset(/*this*/ Chunker* c, ) {
+private void reset(/*this*/ Chunker* c) {
 	c.polShift = uint(c.pol.Deg() - 8);
 	c.fillTables();
 
@@ -245,7 +245,7 @@ private void reset(/*this*/ Chunker* c, ) {
 
 /// fillTables calculates out_table and mod_table for optimization. This
 /// implementation uses a cache in the global variable cache.
-private void fillTables(/*this*/ Chunker* c, ) {
+private void fillTables(/*this*/ Chunker* c) {
 	// if polynomial hasn't been specified, do not compute anything for now
 	if (c.pol == 0) {
 		return;
@@ -885,7 +885,7 @@ public Pol Mul(/*this*/ Pol x, Pol y) {
 }
 
 /// Deg returns the degree of the polynomial x. If x is zero, -1 is returned.
-public int Deg(/*this*/ Pol x, ) {
+public int Deg(/*this*/ Pol x) {
 	// the degree of 0 is -1
 	if (x == 0) {
 		return -1;
@@ -927,12 +927,12 @@ public int Deg(/*this*/ Pol x, ) {
 }
 
 /// String returns the coefficients in hex.
-public string String(/*this*/ Pol x, ) {
+public string String(/*this*/ Pol x) {
 	return "0x" + strconv.FormatUint(ulong(x), 16);
 }
 
 /// Expand returns the string representation of the polynomial x.
-public string Expand(/*this*/ Pol x, ) {
+public string Expand(/*this*/ Pol x) {
 	if (x == 0) {
 		return "0";
 	}
@@ -1065,7 +1065,7 @@ public Pol GCD(/*this*/ Pol x, Pol f) {
 //
 /// For details see "Tests and Constructions of Irreducible Polynomials over
 /// Finite Fields".
-public bool Irreducible(/*this*/ Pol x, ) {
+public bool Irreducible(/*this*/ Pol x) {
 	for (auto i = 1; i <= x.Deg()/2; i++) {
 		if (x.GCD(qp(uint(i), x)) != 1) {
 			return false;
@@ -1115,7 +1115,7 @@ private Pol qp(uint p, Pol g) {
 }
 
 /// MarshalJSON returns the JSON representation of the Pol.
-public void MarshalJSON(/*this*/ Pol x, ) (ubyte[], error) {
+public void MarshalJSON(/*this*/ Pol x) (ubyte[], error) {
 	auto buf = strconv.AppendUint(ubyte[]{'"'}, ulong(x), 16);
 	buf = append(buf, '"');
 	return buf, nil;
