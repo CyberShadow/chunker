@@ -304,8 +304,8 @@ struct Chunker(R)
 		if (!config.tablesInitialized)
 			throw new Exception("tables for polynomial computation not initialized");
 
-		auto tabout = config.tables.out_;
-		auto tabmod = config.tables.mod;
+		auto tabout = &config.tables.out_;
+		auto tabmod = &config.tables.mod;
 		auto polShift = config.polShift;
 		auto minSize = config.minSize;
 		auto maxSize = config.maxSize;
@@ -417,19 +417,19 @@ struct Chunker(R)
 		{
 			auto out_ = window[wpos];
 			window[wpos] = b;
-			digest ^= ulong(tabout[out_].value);
+			digest ^= ulong((*tabout)[out_].value);
 			wpos++;
 			if (wpos >= windowSize)
 				wpos = 0;
 
-			digest = updateDigest(digest, config.polShift, tabmod, b);
+			digest = updateDigest(digest, config.polShift, *tabmod, b);
 		}
 	};
 
 	private void slide(ubyte b)
 	{
-		ref Pol[256] tabout() { return config.tables.out_; }
-		ref Pol[256] tabmod() { return config.tables.mod; }
+		auto tabout = &config.tables.out_;
+		auto tabmod = &config.tables.mod;
 		with (state)
 		{
 			mixin(mixSlide);
