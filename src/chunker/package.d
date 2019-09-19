@@ -136,10 +136,17 @@ struct Chunker(R)
 		public ubyte[] data;
 	}
 
-	private struct State
+	private static struct Hash
 	{
 		private ubyte[windowSize] window;
 		private int wpos;
+
+		private ulong digest;
+	}
+
+	private static struct State
+	{
+		private Hash hash;
 
 		private ubyte[] buf;
 		private uint bpos;
@@ -150,11 +157,9 @@ struct Chunker(R)
 		private uint pos;
 
 		private uint pre; /// wait for this many bytes before start calculating an new chunk
-
-		private ulong digest;
 	}
 
-	private struct Config
+	private static struct Config
 	{
 		public uint minSize, maxSize;
 
@@ -221,13 +226,13 @@ struct Chunker(R)
 		fillTables();
 
 		foreach (i; 0 .. windowSize)
-			state.window[i] = 0;
+			state.hash.window[i] = 0;
 
 		config.closed = false;
-		state.digest = 0;
-		state.wpos = 0;
+		state.hash.digest = 0;
+		state.hash.wpos = 0;
 		state.count = 0;
-		state.digest = slide(state.digest, 1);
+		state.hash.digest = slide(state.hash.digest, 1);
 		state.start = state.pos;
 
 		// do not start a new chunk unless at least minSize bytes have been read
@@ -328,7 +333,7 @@ struct Chunker(R)
 						(
 							/*Start: */ state.start,
 							/*Length:*/ state.count,
-							/*Cut:   */ state.digest,
+							/*Cut:   */ state.hash.digest,
 							/*Data:  */ data,
 						);
 				}
@@ -365,14 +370,14 @@ struct Chunker(R)
 			}
 
 			auto add = state.count;
-			auto digest = state.digest;
-			auto win = state.window;
-			auto wpos = state.wpos;
+			auto window = state.hash.window;
+			auto wpos = state.hash.wpos;
+			auto digest = state.hash.digest;
 			foreach (_, b; buf[state.bpos .. state.bmax])
 			{
 				// slide(b)
-				auto out_ = win[wpos];
-				win[wpos] = b;
+				auto out_ = window[wpos];
+				window[wpos] = b;
 				digest ^= ulong(tabout[out_].value);
 				wpos++;
 				if (wpos >= windowSize)
@@ -412,9 +417,9 @@ struct Chunker(R)
 					return chunk;
 				}
 			}
-			state.digest = digest;
-			state.window = win;
-			state.wpos = wpos;
+			state.hash.window = window;
+			state.hash.wpos = wpos;
+			state.hash.digest = digest;
 
 			auto steps = state.bmax - state.bpos;
 			if (steps > 0)
@@ -427,10 +432,10 @@ struct Chunker(R)
 
 	private ulong slide(ulong digest, ubyte b)
 	{
-		auto out_ = state.window[state.wpos];
-		state.window[state.wpos] = b;
+		auto out_ = state.hash.window[state.hash.wpos];
+		state.hash.window[state.hash.wpos] = b;
 		digest ^= ulong(config.tables.out_[out_].value);
-		state.wpos = (state.wpos + 1) % windowSize;
+		state.hash.wpos = (state.hash.wpos + 1) % windowSize;
 
 		digest = updateDigest(digest, config.polShift, config.tables, b);
 		return digest;
