@@ -256,8 +256,8 @@ private void fillTables(/*this*/ Chunker* c) {
 	// test if the tables are cached for this polynomial
 	synchronized(cache.mutex)
 	{
-		if (t, ok := cache.entries[c.pol]; ok) {
-			c.tables = t;
+		if (auto t = c.pol in cache.entries) {
+			c.tables = *t;
 			return;
 		}
 
