@@ -304,7 +304,7 @@ private void fillTables(/*this*/ Chunker* c) {
 /// current chunk is undefined. When the last chunk has been returned, all
 /// subsequent calls yield an io.EOF error.
 public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
-	data = data[:0];
+	data = data[];
 	if (!c.tablesInitialized) {
 		return Chunk{}, errors.New("tables for polynomial computation not initialized");
 	}
@@ -317,7 +317,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 	auto buf = c.buf;
 	for {
 		if (c.bpos >= c.bmax) {
-			n, err := io.ReadFull(c.rd, buf[:]);
+			n, err := io.ReadFull(c.rd, buf[]);
 
 			if (err == io.ErrUnexpectedEOF) {
 				err = nil;
@@ -355,7 +355,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 			auto n = c.bmax - c.bpos;
 			if (c.pre > uint(n)) {
 				c.pre -= uint(n);
-				data = append(data, buf[c.bpos:c.bmax]...);
+				data = append(data, buf[c.bpos .. c.bmax]...);
 
 				c.count += uint(n);
 				c.pos += uint(n);
@@ -364,7 +364,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 				continue;
 			}
 
-			data = append(data, buf[c.bpos:c.bpos+c.pre]...);
+			data = append(data, buf[c.bpos .. c.bpos+c.pre]...);
 
 			c.bpos += c.pre;
 			c.count += c.pre;
@@ -376,7 +376,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 		auto digest = c.digest;
 		auto win = c.window;
 		auto wpos = c.wpos;
-		foreach (_, b; buf[c.bpos:c.bmax]) {
+		foreach (_, b; buf[c.bpos .. c.bmax]) {
 			// slide(b)
 			auto out_ = win[wpos];
 			win[wpos] = b;
@@ -401,7 +401,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 
 			if ((digest&c.splitmask) == 0 || add >= maxSize) {
 				auto i = add - c.count - 1;
-				data = append(data, c.buf[c.bpos:c.bpos+uint(i)+1]...);
+				data = append(data, c.buf[c.bpos .. c.bpos+uint(i)+1]...);
 				c.count = add;
 				c.pos += uint(i) + 1;
 				c.bpos += uint(i) + 1;
@@ -425,7 +425,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 
 		auto steps = c.bmax - c.bpos;
 		if (steps > 0) {
-			data = append(data, c.buf[c.bpos:c.bpos+steps]...);
+			data = append(data, c.buf[c.bpos .. c.bpos+steps]...);
 		}
 		c.count += steps;
 		c.pos += steps;
@@ -707,9 +707,9 @@ func TestChunkerWithoutHash(testing*.T t) {
 				chunks1[i].Length, len(c.Data));
 		}
 
-		if (!bytes.Equal(buf[c.Start:c.Start+c.Length], c.Data)) {
+		if (!bytes.Equal(buf[c.Start .. c.Start+c.Length], c.Data)) {
 			t.Fatalf("invalid data for chunk returned: expected %02x, got %02x",
-				buf[c.Start:c.Start+c.Length], c.Data);
+				buf[c.Start .. c.Start+c.Length], c.Data);
 		}
 	}
 
@@ -953,7 +953,7 @@ public string Expand(/*this*/ Pol x) {
 		s += "+1";
 	}
 
-	return s[1:];
+	return s[1 .. $];
 }
 
 /// DivMod returns x / d = q, and remainder r,
@@ -1127,7 +1127,7 @@ public error UnmarshalJSON(/*this*/ Pol* x, ubyte[] data) {
 	if (len(data) < 2) {
 		return errors.New("invalid string for polynomial");
 	}
-	n, err := strconv.ParseUint(string(data[1:len(data)-1]), 16, 64);
+	n, err := strconv.ParseUint(string(data[1 .. len(data)-1]), 16, 64);
 	if (err != nil) {
 		return err;
 	}
