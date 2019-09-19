@@ -293,7 +293,7 @@ version(unittest) import std.stdio : stderr;
 	testWithData(ch, chunks2, false);
 }
 
-version = benchmark;
+version(unittest) version = benchmark;
 version (benchmark) enum N = 1;
 
 version (benchmark) void benchmarkChunker(bool checkDigest)

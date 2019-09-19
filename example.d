@@ -1,10 +1,10 @@
-module chunker.example_test;
+module chunker.example;
 
 import chunker;
 import chunker.chunker_test;
 import chunker.polynomials;
 
-void ExampleChunker()
+void main()
 {
 	import std.stdio, std.digest.sha;
 
@@ -25,7 +25,7 @@ void ExampleChunker()
 			break;
 		}
 
-		writefln!"%d %(%02x%)\n"(chunk.Length, sha256Of(chunk.Data));
+		writefln!"%d %(%02x%)"(chunk.Length, sha256Of(chunk.Data));
 	}
 
 	// Output:
