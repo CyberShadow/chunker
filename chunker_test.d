@@ -117,14 +117,14 @@ version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChun
 
 		if (c.Cut != chunk.CutFP) {
 			assert(false, format!"Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x"
-				(i, chunks.length-1, chunk.CutFP, c.Cut));
+				(i, testChunks.length-1, chunk.CutFP, c.Cut));
 		}
 
 		if (checkDigest) {
 			auto digest = hashData(c.Data);
 			if (!(chunk.Digest == digest)) {
 				assert(false, format!"Digest fingerprint for chunk %d/%d does not match: expected %(%02x%), got %(%02x%)"
-					(i, chunks.length-1, chunk.Digest, digest));
+					(i, testChunks.length-1, chunk.Digest, digest));
 			}
 		}
 
