@@ -144,13 +144,16 @@ version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChun
 	return chunks;
 }
 
+private import chunker.gorng;
+
 package ubyte[] getRandom(int seed, int count) {
 	import std.random : Random, uniform;
 	auto buf = new ubyte[count];
 
-	auto rnd = Random(seed);
+	rngSource rnd;
+	Seed(&rnd, seed);
 	for (auto i = 0; i < count; i += 4) {
-		auto r = uniform!uint(rnd);
+		auto r = Int63(&rnd) >> 31;
 		buf[i] = cast(ubyte)(r);
 		buf[i+1] = cast(ubyte)(r >> 8);
 		buf[i+2] = cast(ubyte)(r >> 16);
