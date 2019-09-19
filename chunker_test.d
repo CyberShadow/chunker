@@ -27,7 +27,8 @@ private enum testPol = Pol(0x3DA3358B4DC173);
 /// chunking configuration:
 /// window size 64, avg chunksize 1<<20, min chunksize 1<<19, max chunksize 1<<23
 /// polynom 0x3DA3358B4DC173
-chunk[] chunks1 = [
+chunk[] chunks1 =
+[
 	{2163460, 0x000b98d4cdf00000, parseDigest!"4b94cb2cf293855ea43bf766731c74969b91aa6bf3c078719aabdd19860d590d"},
 	{643703, 0x000d4e8364d00000, parseDigest!"5727a63c0964f365ab8ed2ccf604912f2ea7be29759a2b53ede4d6841e397407"},
 	{1528956, 0x0015a25c2ef00000, parseDigest!"a73759636a1e7a2758767791c69e81b69fb49236c6929e5d1b654e06e37674ba"},
@@ -54,7 +55,8 @@ chunk[] chunks1 = [
 ];
 
 /// test if nullbytes are correctly split, even if length is a multiple of MinSize.
-chunk[] chunks2 = [
+chunk[] chunks2 =
+[
 	{MinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
 	{MinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
 	{MinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
@@ -62,7 +64,8 @@ chunk[] chunks2 = [
 ];
 
 /// the same as chunks1, but avg chunksize is 1<<19
-chunk[] chunks3 = [
+chunk[] chunks3 =
+[
 	{1491586, 0x00023e586ea80000, parseDigest!"4c008237df602048039287427171cef568a6cb965d1b5ca28dc80504a24bb061"},
 	{671874, 0x000b98d4cdf00000, parseDigest!"fa8a42321b90c3d4ce9dd850562b2fd0c0fe4bdd26cf01a24f22046a224225d3"},
 	{643703, 0x000d4e8364d00000, parseDigest!"5727a63c0964f365ab8ed2ccf604912f2ea7be29759a2b53ede4d6841e397407"},
@@ -98,31 +101,38 @@ chunk[] chunks3 = [
 
 version(unittest) import std.format;
 
-version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChunks, bool checkDigest) {
+version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChunks, bool checkDigest)
+{
 	Chunk[] chunks;
 
 	auto pos = uint(0);
-	foreach (i, chunk; testChunks) {
+	foreach (i, chunk; testChunks)
+	{
 		auto c = chnker.Next(null);
 
-		if (c.Start != pos) {
+		if (c.Start != pos)
+		{
 			assert(false, format!"Start for chunk %d does not match: expected %d, got %d"
 				(i, pos, c.Start));
 		}
 
-		if (c.Length != chunk.Length) {
+		if (c.Length != chunk.Length)
+		{
 			assert(false, format!"Length for chunk %d does not match: expected %d, got %d"
 				(i, chunk.Length, c.Length));
 		}
 
-		if (c.Cut != chunk.CutFP) {
+		if (c.Cut != chunk.CutFP)
+		{
 			assert(false, format!"Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x"
 				(i, testChunks.length-1, chunk.CutFP, c.Cut));
 		}
 
-		if (checkDigest) {
+		if (checkDigest)
+		{
 			auto digest = hashData(c.Data);
-			if (!(chunk.Digest == digest)) {
+			if (!(chunk.Digest == digest))
+			{
 				assert(false, format!"Digest fingerprint for chunk %d/%d does not match: expected %(%02x%), got %(%02x%)"
 					(i, testChunks.length-1, chunk.Digest, digest));
 			}
@@ -133,11 +143,13 @@ version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChun
 	}
 
 	auto c = chnker.Next(null);
-	if (c !is Chunk.init) {
+	if (c !is Chunk.init)
+	{
 		assert(false, "Wrong error returned after last chunk");
 	}
 
-	if (chunks.length != testChunks.length) {
+	if (chunks.length != testChunks.length)
+	{
 		assert(false, "Amounts of test and resulting chunks do not match");
 	}
 
@@ -146,13 +158,15 @@ version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChun
 
 private import chunker.gorng;
 
-package ubyte[] getRandom(int seed, int count) {
+package ubyte[] getRandom(int seed, int count)
+{
 	import std.random : Random, uniform;
 	auto buf = new ubyte[count];
 
 	rngSource rnd;
 	Seed(&rnd, seed);
-	for (auto i = 0; i < count; i += 4) {
+	for (auto i = 0; i < count; i += 4)
+	{
 		auto r = Int63(&rnd) >> 31;
 		buf[i] = cast(ubyte)(r);
 		buf[i+1] = cast(ubyte)(r >> 8);
@@ -163,7 +177,8 @@ package ubyte[] getRandom(int seed, int count) {
 	return buf;
 }
 
-version(unittest) private ubyte[32] hashData(ubyte[] d) {
+version(unittest) private ubyte[32] hashData(ubyte[] d)
+{
 	import std.digest.sha;
 	return sha256Of(d);
 }
@@ -177,7 +192,8 @@ package File bufFile(ubyte[] buf)
 	return File("temp.bin", "rb");
 }
 
-@(`Chunker`) unittest {
+@(`Chunker`) unittest
+{
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
 	auto ch = New(bufFile(buf), testPol);
@@ -190,7 +206,8 @@ package File bufFile(ubyte[] buf)
 	testWithData(ch, chunks2, true);
 }
 
-@(`ChunkerWithCustomAverageBits`) unittest {
+@(`ChunkerWithCustomAverageBits`) unittest
+{
 	auto buf = getRandom(23, 32*1024*1024);
 	auto ch = New(bufFile(buf), testPol);
 
@@ -199,7 +216,8 @@ package File bufFile(ubyte[] buf)
 	testWithData(ch, chunks3, true);
 }
 
-@(`ChunkerReset`) unittest {
+@(`ChunkerReset`) unittest
+{
 	auto buf = getRandom(23, 32*1024*1024);
 	auto ch = New(bufFile(buf), testPol);
 	testWithData(ch, chunks1, true);
@@ -210,7 +228,8 @@ package File bufFile(ubyte[] buf)
 
 version(unittest) import std.stdio : stderr;
 
-@(`ChunkerWithRandomPolynomial`) unittest {
+@(`ChunkerWithRandomPolynomial`) unittest
+{
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
 
@@ -227,20 +246,24 @@ version(unittest) import std.stdio : stderr;
 	// make sure that first chunk is different
 	auto c = ch.Next(null);
 
-	if (c.Cut == chunks1[0].CutFP) {
+	if (c.Cut == chunks1[0].CutFP)
+	{
 		assert(false, "Cut point is the same");
 	}
 
-	if (c.Length == chunks1[0].Length) {
+	if (c.Length == chunks1[0].Length)
+	{
 		assert(false, "Length is the same");
 	}
 
-	if (hashData(c.Data) == chunks1[0].Digest) {
+	if (hashData(c.Data) == chunks1[0].Digest)
+	{
 		assert(false, "Digest is the same");
 	}
 }
 
-@(`ChunkerWithoutHash`) unittest {
+@(`ChunkerWithoutHash`) unittest
+{
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
 
@@ -248,13 +271,16 @@ version(unittest) import std.stdio : stderr;
 	auto chunks = testWithData(ch, chunks1, false);
 
 	// test reader
-	foreach (i, c; chunks) {
-		if (c.Data.length != chunks1[i].Length) {
+	foreach (i, c; chunks)
+	{
+		if (c.Data.length != chunks1[i].Length)
+		{
 			assert(false, format!"reader returned wrong number of bytes: expected %d, got %d"
 				(chunks1[i].Length, c.Data.length));
 		}
 
-		if (!(buf[c.Start .. c.Start+c.Length] == c.Data)) {
+		if (!(buf[c.Start .. c.Start+c.Length] == c.Data))
+		{
 			assert(false, format!"invalid data for chunk returned: expected %(%02x%), got %(%02x%)"
 				(buf[c.Start .. c.Start+c.Length], c.Data));
 		}
@@ -270,7 +296,8 @@ version(unittest) import std.stdio : stderr;
 version = benchmark;
 version (benchmark) enum N = 1;
 
-version (benchmark) void benchmarkChunker(bool checkDigest) {
+version (benchmark) void benchmarkChunker(bool checkDigest)
+{
 	auto size = 32 * 1024 * 1024;
 	auto rd = bufFile(getRandom(23, size));
 	auto ch = New(rd, testPol);
@@ -280,7 +307,8 @@ version (benchmark) void benchmarkChunker(bool checkDigest) {
 	// b.SetBytes(long(size));
 
 	int chunks;
-	for (auto i = 0; i < N; i++) {
+	for (auto i = 0; i < N; i++)
+	{
 		chunks = 0;
 
 		rd.seek(0);
@@ -288,27 +316,36 @@ version (benchmark) void benchmarkChunker(bool checkDigest) {
 		ch.Reset(rd, testPol);
 
 		auto cur = 0;
-		while (true) {
+		while (true)
+		{
 			auto chunk = ch.Next(buf);
 
-			if (chunk is Chunk.init) {
+			if (chunk is Chunk.init)
+			{
 				break;
 			}
 
-			if (chunk.Length != chunks1[cur].Length) {
-				assert(false, format!"wrong chunk length, want %d, got %d"(
+			if (chunk.Length != chunks1[cur].Length)
+			{
+				assert(false, format!"wrong chunk length, want %d, got %d"
+				(
 					chunks1[cur].Length, chunk.Length));
 			}
 
-			if (chunk.Cut != chunks1[cur].CutFP) {
-				assert(false, format!"wrong cut fingerprint, want 0x%x, got 0x%x"(
+			if (chunk.Cut != chunks1[cur].CutFP)
+			{
+				assert(false, format!"wrong cut fingerprint, want 0x%x, got 0x%x"
+				(
 					chunks1[cur].CutFP, chunk.Cut));
 			}
 
-			if (checkDigest) {
+			if (checkDigest)
+			{
 				auto h = hashData(chunk.Data);
-				if (!(h == chunks1[cur].Digest)) {
-					assert(false, format!"wrong digest, want %(%02x%), got %(%02x%)"(
+				if (!(h == chunks1[cur].Digest))
+				{
+					assert(false, format!"wrong digest, want %(%02x%), got %(%02x%)"
+					(
 						chunks1[cur].Digest, h));
 				}
 			}
@@ -321,20 +358,24 @@ version (benchmark) void benchmarkChunker(bool checkDigest) {
 	stderr.writefln!"%d chunks, average chunk size: %d bytes"(chunks, size/chunks);
 }
 
-version (benchmark) @(`BenchmarkChunkerWithSHA256`) unittest {
+version (benchmark) @(`BenchmarkChunkerWithSHA256`) unittest
+{
 	benchmarkChunker(true);
 }
 
-version (benchmark) @(`BenchmarkChunker`) unittest {
+version (benchmark) @(`BenchmarkChunker`) unittest
+{
 	benchmarkChunker(false);
 }
 
-version (benchmark) @(`BenchmarkNewChunker`) unittest {
+version (benchmark) @(`BenchmarkNewChunker`) unittest
+{
 	auto p = RandomPolynomial();
 
 	// b.ResetTimer();
 
-	for (auto i = 0; i < N; i++) {
+	for (auto i = 0; i < N; i++)
+	{
 		New(bufFile(null), p);
 	}
 }

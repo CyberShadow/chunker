@@ -4,7 +4,8 @@ import chunker;
 import chunker.chunker_test;
 import chunker.polynomials;
 
-void ExampleChunker() {
+void ExampleChunker()
+{
 	import std.stdio, std.digest.sha;
 
 	// generate 32MiB of deterministic pseudo-random data
@@ -16,9 +17,11 @@ void ExampleChunker() {
 	// reuse this buffer
 	auto buf = new ubyte[8*1024*1024];
 
-	for (auto i = 0; i < 5; i++) {
+	for (auto i = 0; i < 5; i++)
+	{
 		auto chunk = chunker.Next(buf);
-		if (chunk is Chunk.init) {
+		if (chunk is Chunk.init)
+		{
 			break;
 		}
 

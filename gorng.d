@@ -23,8 +23,9 @@ enum rngMax   = 1L << 63;
 enum rngMask  = rngMax - 1;
 enum int32max = (1 << 31) - 1;
 
-	// rngCooked used for seeding. See gen_cooked.go for details.
-immutable long[rngLen] rngCooked = [
+// rngCooked used for seeding. See gen_cooked.go for details.
+immutable long[rngLen] rngCooked =
+[
 		-4181792142133755926, -4576982950128230565, 1395769623340756751, 5333664234075297259,
 		-6347679516498800754, 9033628115061424579, 7143218595135194537, 4812947590706362721,
 		7937252194349799378, 5307299880338848416, 8209348851763925077, -7107630437535961764,
@@ -179,14 +180,16 @@ immutable long[rngLen] rngCooked = [
 		8382142935188824023, 9103922860780351547, 4152330101494654406,
 ];
 
-struct rngSource {
+struct rngSource
+{
 	int tap;           // index into vec
 	int feed;          // index into vec
 	long[rngLen] vec;  // current feedback register
 }
 
 // seed rng x[n+1] = 48271 * x[n] mod (2**31 - 1)
-int seedrand(int x) {
+int seedrand(int x)
+{
 	enum A = 48271;
 	enum Q = 44488;
 	enum R = 3399;
@@ -194,29 +197,35 @@ int seedrand(int x) {
 	auto hi = x / Q;
 	auto lo = x % Q;
 	x = A*lo - R*hi;
-	if (x < 0) {
+	if (x < 0)
+	{
 		x += int32max;
 	}
 	return x;
 }
 
 // Seed uses the provided seed value to initialize the generator to a deterministic state.
-void Seed(/*this*/ rngSource* rng, long seed) {
+void Seed(/*this*/ rngSource* rng, long seed)
+{
 	rng.tap = 0;
 	rng.feed = rngLen - rngTap;
 
 	seed = seed % int32max;
-	if (seed < 0) {
+	if (seed < 0)
+	{
 		seed += int32max;
 	}
-	if (seed == 0) {
+	if (seed == 0)
+	{
 		seed = 89482311;
 	}
 
 	auto x = cast(int)seed;
-	for (auto i = -20; i < rngLen; i++) {
+	for (auto i = -20; i < rngLen; i++)
+	{
 		x = seedrand(x);
-		if (i >= 0) {
+		if (i >= 0)
+		{
 			long u;
 			u = long(x) << 40;
 			x = seedrand(x);
@@ -230,19 +239,23 @@ void Seed(/*this*/ rngSource* rng, long seed) {
 }
 
 // Int63 returns a non-negative pseudo-random 63-bit integer as an long.
-long Int63(/*this*/ rngSource* rng) {
+long Int63(/*this*/ rngSource* rng)
+{
 	return long(rng.Uint64() & rngMask);
 }
 
 // Uint64 returns a non-negative pseudo-random 64-bit integer as an uint64.
-ulong Uint64(/*this*/ rngSource* rng) {
+ulong Uint64(/*this*/ rngSource* rng)
+{
 	rng.tap--;
-	if (rng.tap < 0) {
+	if (rng.tap < 0)
+	{
 		rng.tap += rngLen;
 	}
 
 	rng.feed--;
-	if (rng.feed < 0) {
+	if (rng.feed < 0)
+	{
 		rng.feed += rngLen;
 	}
 
