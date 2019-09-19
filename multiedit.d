@@ -306,7 +306,7 @@ private void fillTables(/*this*/ Chunker* c) {
 public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 	data = data[];
 	if (!c.tablesInitialized) {
-		return Chunk{}, errors.New("tables for polynomial computation not initialized");
+		throw new Exception("tables for polynomial computation not initialized");
 	}
 
 	auto tabout = c.tables.out_;
@@ -1041,7 +1041,7 @@ public (Pol, error) DerivePolynomial(io.Reader source) {
 
 	// If this is reached, we haven't found an irreducible polynomial in
 	// randPolMaxTries. This error is very unlikely to occur.
-	return 0, errors.New("unable to find new random irreducible polynomial");
+	throw new Exception("unable to find new random irreducible polynomial");
 }
 
 /// GCD computes the Greatest Common Divisor x and f.
@@ -1125,7 +1125,7 @@ public void MarshalJSON(/*this*/ Pol x) (ubyte[], error) {
 /// UnmarshalJSON parses a Pol from the JSON data.
 public error UnmarshalJSON(/*this*/ Pol* x, ubyte[] data) {
 	if (len(data) < 2) {
-		return errors.New("invalid string for polynomial");
+		throw new Exception("invalid string for polynomial");
 	}
 	n, err := strconv.ParseUint(string(data[1 .. len(data)-1]), 16, 64);
 	if (err != nil) {
