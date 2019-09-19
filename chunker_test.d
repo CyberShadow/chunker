@@ -268,7 +268,7 @@ version(unittest) import std.stdio : stderr;
 }
 
 version = benchmark;
-version (benchmark) enum N = 1000;
+version (benchmark) enum N = 1;
 
 version (benchmark) void benchmarkChunker(bool checkDigest) {
 	auto size = 32 * 1024 * 1024;
