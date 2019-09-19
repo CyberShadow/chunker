@@ -209,6 +209,9 @@ polModTest[] polModTests = [
 	}
 }
 
+version = benchmark;
+version (benchmark) enum N = 1;
+
 version(benchmark) @(`BenchmarkPolDivMod`) unittest {
 	auto f = Pol(0x2482734cacca49);
 	auto g = Pol(0x3af4b284899);
