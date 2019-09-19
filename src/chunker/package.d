@@ -227,7 +227,7 @@ struct Chunker(R)
 		state.digest = 0;
 		state.wpos = 0;
 		state.count = 0;
-		state.digest = slide(state.digest, 1);
+		slide(1);
 		state.start = state.pos;
 
 		// do not start a new chunk unless at least minSize bytes have been read
@@ -366,25 +366,11 @@ struct Chunker(R)
 
 			auto add = state.count;
 			auto digest = state.digest;
-			auto win = state.window;
+			auto window = state.window;
 			auto wpos = state.wpos;
 			foreach (_, b; buf[state.bpos .. state.bmax])
 			{
-				// slide(b)
-				auto out_ = win[wpos];
-				win[wpos] = b;
-				digest ^= ulong(tabout[out_].value);
-				wpos++;
-				if (wpos >= windowSize)
-					wpos = 0;
-
-				// updateDigest
-				auto index = cast(ubyte)(digest >> polShift);
-				digest <<= 8;
-				digest |= ulong(b);
-
-				digest ^= ulong(tabmod[index].value);
-				// end manual inline
+				mixin(mixSlide);
 
 				add++;
 				if (add < minSize)
@@ -413,7 +399,7 @@ struct Chunker(R)
 				}
 			}
 			state.digest = digest;
-			state.window = win;
+			state.window = window;
 			state.wpos = wpos;
 
 			auto steps = state.bmax - state.bpos;
@@ -425,25 +411,40 @@ struct Chunker(R)
 		}
 	}
 
-	private ulong slide(ulong digest, ubyte b)
-	{
-		auto out_ = state.window[state.wpos];
-		state.window[state.wpos] = b;
-		digest ^= ulong(config.tables.out_[out_].value);
-		state.wpos = (state.wpos + 1) % windowSize;
+	// Use string-mixins for "inlining".
+	// See: https://forum.dlang.org/post/dpdknvlxcgqtncusmjax@forum.dlang.org
+	private enum mixSlide = q{
+		{
+			auto out_ = window[wpos];
+			window[wpos] = b;
+			digest ^= ulong(tabout[out_].value);
+			wpos++;
+			if (wpos >= windowSize)
+				wpos = 0;
 
-		digest = updateDigest(digest, config.polShift, config.tables, b);
-		return digest;
+			digest = updateDigest(digest, config.polShift, tabmod, b);
+		}
+	};
+
+	private void slide(ubyte b)
+	{
+		ref Pol[256] tabout() { return config.tables.out_; }
+		ref Pol[256] tabmod() { return config.tables.mod; }
+		with (state)
+		{
+			mixin(mixSlide);
+		}
 	}
 }
 
-private ulong /*newDigest*/ updateDigest(ulong digest, uint polShift, Tables tab, ubyte b)
+private ulong /*newDigest*/ updateDigest(ulong digest, uint polShift, ref Pol[256] tabmod, ubyte b)
 {
-	auto index = digest >> polShift;
+	pragma(inline, true);
+	auto index = cast(ubyte)(digest >> polShift);
 	digest <<= 8;
 	digest |= ulong(b);
 
-	digest ^= ulong(tab.mod[index].value);
+	digest ^= ulong(tabmod[index].value);
 	return digest;
 }
 
