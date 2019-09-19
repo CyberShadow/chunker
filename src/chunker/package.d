@@ -370,7 +370,7 @@ struct Chunker(R)
 			auto wpos = state.wpos;
 			foreach (_, b; buf[state.bpos .. state.bmax])
 			{
-				mixin(mixSlide);
+				.slide(window, wpos, digest, *tabout, *tabmod, polShift, b);
 
 				add++;
 				if (add < minSize)
@@ -411,30 +411,22 @@ struct Chunker(R)
 		}
 	}
 
-	// Use string-mixins for "inlining".
-	// See: https://forum.dlang.org/post/dpdknvlxcgqtncusmjax@forum.dlang.org
-	private enum mixSlide = q{
-		{
-			auto out_ = window[wpos];
-			window[wpos] = b;
-			digest ^= ulong((*tabout)[out_].value);
-			wpos++;
-			if (wpos >= windowSize)
-				wpos = 0;
-
-			digest = updateDigest(digest, config.polShift, *tabmod, b);
-		}
-	};
-
 	private void slide(ubyte b)
 	{
-		auto tabout = &config.tables.out_;
-		auto tabmod = &config.tables.mod;
-		with (state)
-		{
-			mixin(mixSlide);
-		}
+		.slide(state.window, state.wpos, state.digest, config.tables.out_, config.tables.mod, config.polShift, b);
 	}
+}
+
+private void slide(ref ubyte[windowSize] window, ref size_t wpos, ref ulong digest, ref Pol[256] tabout, ref Pol[256] tabmod, uint polShift, ubyte b)
+{
+	auto out_ = window[wpos];
+	window[wpos] = b;
+	digest ^= ulong(tabout[out_].value);
+	wpos++;
+	if (wpos >= windowSize)
+		wpos = 0;
+
+	digest = updateDigest(digest, polShift, tabmod, b);
 }
 
 private ulong /*newDigest*/ updateDigest(ulong digest, uint polShift, ref Pol[256] tabmod, ubyte b)
