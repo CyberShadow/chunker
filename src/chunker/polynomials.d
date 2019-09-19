@@ -1,12 +1,12 @@
 module chunker.polynomials;
 
-/// Pol is a polynomial from F_2[X].
+/// Pol is a polynomial from `F_2[X]`.
 struct Pol
 {
 	alias Base = ulong;
 	Base value;
 
-	/// add returns x+y.
+	/// Returns `this+y`.
 	public Pol opBinary(string op)(Pol y) const
 	if (op == "+")
 	{
@@ -38,7 +38,7 @@ struct Pol
 	}
 
 
-	/// mulOverflows returns true if the multiplication would overflow ulong.
+	/// Returns true if the multiplication would overflow `Pol.Base`.
 	/// Code by Rob Pike, see
 	/// https://groups.google.com/d/msg/golang-nuts/h5oSN5t3Au4/KaNQREhZh0QJ
 	private static bool mulOverflows(Pol a, Pol b)
@@ -66,7 +66,8 @@ struct Pol
 		return res;
 	}
 
-	/// mul returns x*y. When an overflow occurs, mul throws an exception.
+	/// Returns `this*y`.
+	/// When an overflow occurs, throws an exception.
 	public Pol opBinary(string op)(Pol y) const
 	if (op == "*")
 	{
@@ -164,7 +165,8 @@ struct Pol
 	}
 
 
-	/// deg returns the degree of the polynomial x. If x is zero, -1 is returned.
+	/// Returns the degree of the polynomial.
+	/// If `this` is zero, -1 is returned.
 	@property public int deg() const
 	{
 		Base x = this.value;
@@ -245,14 +247,14 @@ struct Pol
 	}
 
 
-	/// String returns the coefficients in hex.
+	/// Returns the coefficients in hex.
 	public string toString() const
 	{
 		import std.conv : to;
 		return "0x" ~ to!string(this.value, 16);
 	}
 
-	/// Expand returns the string representation of the polynomial x.
+	/// Returns the string representation of the polynomial x.
 	public string expand() const
 	{
 		import std.format : format;
@@ -283,7 +285,7 @@ struct Pol
 	}
 
 
-	/// divMod returns x / d = q, and remainder r,
+	/// Returns quotient and remainder from division `[x / d, x % d]`,
 	/// see https://en.wikipedia.org/wiki/Division_algorithm
 	public static Pol[2] divMod(Pol x, Pol d)
 	{
@@ -321,7 +323,7 @@ struct Pol
 	}
 
 
-	/// Div returns the integer division result x / d.
+	/// Returns the integer division result `this / d`.
 	public Pol opBinary(string op)(Pol d) const
 	if (op == "/")
 	{
@@ -382,7 +384,7 @@ struct Pol
 	}
 
 
-	/// Mod returns the remainder of x / d
+	/// Returns the remainder of `this / d`.
 	public Pol opBinary(string op)(Pol d) const
 	if (op == "%")
 	{
@@ -447,9 +449,9 @@ struct Pol
 	/// randPolMaxTries.
 	private enum randPolMaxTries = 1e6;
 
-	/// RandomPolynomial returns a new random irreducible polynomial
-	/// of degree 53 using the default System CSPRNG as source.
-	/// It is equivalent to calling DerivePolynomial(rand.Reader).
+	/// Returns a new random irreducible polynomial of degree 53 using
+	/// the default `rndGen` as source.  It is equivalent to calling
+	/// `derive(rndGen)`.
 	public static Pol getRandom()
 	{
 		import std.random : rndGen;
@@ -468,10 +470,10 @@ struct Pol
 	}
 
 
-	/// DerivePolynomial returns an irreducible polynomial of degree 53
+	/// Returns an irreducible polynomial of degree 53
 	/// (largest prime number below 64-8) by reading bytes from source.
 	/// There are (2^53-2/53) irreducible polynomials of degree 53 in
-	/// F_2[X], c.f. Michael O. Rabin (1981): "Fingerprinting by Random
+	/// `F_2[X]`, c.f. Michael O. Rabin (1981): "Fingerprinting by Random
 	/// Polynomials", page 4. If no polynomial could be found in one
 	/// million tries, an error is returned.
 	public static Pol derive(Random)(Random source)
@@ -501,7 +503,7 @@ struct Pol
 		throw new Exception("unable to find new random irreducible polynomial");
 	}
 
-	/// gcd computes the Greatest Common Divisor x and f.
+	/// Computes the Greatest Common Divisor of `x` and `f`.
 	public static Pol gcd(Pol x, Pol f)
 	{
 		if (f.value == 0)
@@ -589,11 +591,11 @@ struct Pol
 	}
 
 
-	/// irreducible returns true iff x is irreducible over F_2. This function
-	/// uses Ben Or's reducibility test.
+	/// Returns `true` iff `x` is irreducible over `F_2`.
+	/// This function uses Ben Or's reducibility test.
 	//
-	/// For details see "Tests and Constructions of Irreducible Polynomials over
-	/// Finite Fields".
+	/// For details see "Tests and Constructions of Irreducible
+	/// Polynomials over Finite Fields".
 	@property public bool irreducible() const
 	{
 		for (auto i = 1; i <= this.deg/2; i++)
@@ -664,7 +666,7 @@ struct Pol
 	}
 
 
-	/// x.mulMod(f, g) computes x*f mod g
+	/// Computes `this*f mod g`.
 	public Pol mulMod(Pol f, Pol g)
 	{
 		if (value == 0 || f.value == 0)
@@ -718,8 +720,8 @@ struct Pol
 	}
 
 
-	/// qp computes the polynomial (x^(2^p)-x) mod g. This is needed for the
-	/// reducibility test.
+	/// Computes the polynomial `(x^(2^p)-x) mod g`.
+	/// This is needed for the reducibility test.
 	static private Pol qp(uint p, Pol g)
 	{
 		auto num = (1L << p);

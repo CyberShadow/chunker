@@ -3,8 +3,9 @@ Package chunker implements Content Defined Chunking (CDC) based on a rolling
 Rabin Checksum.
 
 Choosing a Random Irreducible Polynomial
+========================================
 
-The function RandomPolynomial() returns a new random polynomial of degree 53
+The function `Pol.getRandom()` returns a new random polynomial of degree 53
 for use with the chunker. The degree 53 is chosen because it is the largest
 prime below 64-8 = 56, so that the top 8 bits of an ulong can be used for
 optimising calculations in the chunker.
@@ -14,7 +15,7 @@ A random polynomial is chosen selecting 64 random bits, masking away bits
 desired degree) and bit 0 to one (otherwise the polynomial is trivially
 reducible), so that 51 bits are chosen at random.
 
-This process is repeated until Irreducible() returns true, then this
+This process is repeated until `Pol.irreducible` returns `true`, then this
 polynomials is returned. If this doesn't happen after 1 million tries, the
 function returns an error. The probability for selecting an irreducible
 polynomial at random is about 7.5% ( (2^53-2)/53 / 2^51), so the probability
@@ -22,6 +23,7 @@ that no irreducible polynomial has been found after 100 tries is lower than
 0.04%.
 
 Verifying Irreducible Polynomials
+=================================
 
 During development the results have been verified using the computational
 discrete algebra system GAP, which can be obtained from the website at
@@ -30,6 +32,7 @@ http://www.gap-system.org/.
 For filtering a given list of polynomials in hexadecimal coefficient notation,
 the following script can be used:
 
+```
 	# create x over F_2 = GF(2);
 	x := Indeterminate(GF(2), "x");
 
@@ -52,10 +55,12 @@ the following script can be used:
 
 	# filter and display the list of irreducible polynomials contained in L;
 	Display(Filtered(L, x -> (IrredPoly(x))));
+```
 
 All irreducible polynomials from the list are written to the output.
 
 Background Literature
+=====================
 
 An introduction to Rabin Fingerprints/Checksums can be found in the following articles:
 
@@ -88,12 +93,12 @@ import chunker.polynomials;
 private enum kiB = 1024;
 private enum miB = 1024 * kiB;
 
-/// WindowSize is the size of the sliding window.
+/// Size of the sliding window.
 private enum windowSize = 64;
 
-/// minSize is the default minimal size of a chunk.
+/// Default minimal size of a chunk.
 public enum minSize = 512 * kiB;
-/// maxSize is the default maximal size of a chunk.
+/// Default maximal size of a chunk.
 public enum maxSize = 8 * miB;
 
 private enum chunkerBufSize = 512 * kiB;
@@ -105,7 +110,7 @@ private struct Tables
 	private Pol[256] mod;
 }
 
-/// cache precomputed tables, these are read-only anyway
+// cache precomputed tables, these are read-only anyway
 private struct cache
 {
 static:
@@ -118,11 +123,11 @@ static this()
 	cache.mutex = new Object;
 }
 
-/// Chunker splits content with Rabin Fingerprints.
+/// Splits content with Rabin Fingerprints.
 struct Chunker(R)
 {
-	/// Chunk is one content-dependent chunk of bytes whose end was cut when the
-	/// Rabin Fingerprint had the value stored in Cut.
+	/// One content-dependent chunk of bytes whose end was cut when
+	/// the Rabin Fingerprint had the value stored in `cut`.
 	public struct Chunk
 	{
 		public uint start;
@@ -144,7 +149,7 @@ struct Chunker(R)
 		private uint count;
 		private uint pos;
 
-		private uint pre; // wait for this many bytes before start calculating an new chunk
+		private uint pre; /// wait for this many bytes before start calculating an new chunk
 
 		private ulong digest;
 	}
@@ -166,35 +171,37 @@ struct Chunker(R)
 	Config config;
 	State state;
 
-	/// setAverageBits allows to control the frequency of chunk discovery:
-	/// the lower averageBits, the higher amount of chunks will be identified.
-	/// The default value is 20 bits, so chunks will be of 1MiB size on average.
+	/// Allows to control the frequency of chunk discovery: the lower
+	/// `averageBits`, the higher amount of chunks will be identified.
+	/// The default value is 20 bits, so chunks will be of 1MiB size
+	/// on average.
 	public void setAverageBits(int averageBits)
 	{
 		config.splitmask = (1 << ulong(averageBits)) - 1;
 	}
 
-	/// Constructs a new Chunker based on polynomial p that reads from rd.
+	/// Constructs a new `Chunker` based on polynomial `pol` that
+	/// reads from `rd`.
 	public this(R rd, Pol pol)
 	{
 		this(rd, pol, minSize, maxSize);
 	}
 
-	/// Constructs a new Chunker based on polynomial p that reads from
-	/// rd and custom min and max size boundaries.
+	/// Constructs a new `Chunker` based on polynomial `pol` that
+	/// reads from `rd` and custom `min` and `max` size boundaries.
 	public this(R rd, Pol pol, uint min, uint max)
 	{
 		resetWithBoundaries(rd, pol, minSize, maxSize);
 	}
 
-	/// reset reinitializes the chunker with a new reader and polynomial.
+	/// Reinitializes the `Chunker` with a new reader and polynomial.
 	public void reset(R rd, Pol pol)
 	{
 		resetWithBoundaries(rd, pol, minSize, maxSize);
 	}
 
-	/// resetWithBoundaries reinitializes the chunker with a new reader, polynomial
-	/// and custom min and max size boundaries.
+	/// Reinitializes the `Chunker` with a new reader, polynomial and
+	/// custom min and max size boundaries.
 	public void resetWithBoundaries(R rd, Pol pol, uint min, uint max)
 	{
 		state = State();
@@ -227,8 +234,9 @@ struct Chunker(R)
 		state.pre = config.minSize - windowSize;
 	}
 
-	/// fillTables calculates out_table and mod_table for optimization. This
-	/// implementation uses a cache in the global variable cache.
+	/// `fillTables` calculates `out_table` and `mod_table` for
+	/// optimization. This implementation uses a cache in the global
+	/// variable `cache`.
 	private void fillTables()
 	{
 		// if polynomial hasn't been specified, do not compute anything for now
@@ -285,10 +293,11 @@ struct Chunker(R)
 		}
 	}
 
-	/// next returns the position and length of the next chunk of data. If an error
-	/// occurs while reading, the error is returned. Afterwards, the state of the
-	/// current chunk is undefined. When the last chunk has been returned, all
-	/// subsequent calls yield an io.EOF error.
+	/// Returns the position and length of the next chunk of data.
+	/// If an exception occurs while reading, it is propagated.
+	/// Afterwards, the state of the current chunk is undefined.
+	/// When the last chunk has been returned, all subsequent calls
+	/// return `Chunk.init`.
 	public Chunk next(ubyte[] data)
 	{
 		data = data[0..0];

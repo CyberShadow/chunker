@@ -3,13 +3,17 @@ module chunker.benchmark;
 
 /**
  * To make a module benchmarkable, add:
+ * ---
  * version (benchmarkYourModule) { import chunker.benchmark; mixin BenchmarkThisModule; }
+ * ---
  *
  * Then, declare benchmarks by declaring private functions with a name
  * starting with "benchmark", e.g. `void benchmarkFoo() { ... }`.
  *
  * To benchmark a benchmarkable module, run:
+ * ---
  * dmd -version=benchmarkYourModule -run module.d [--N=<iterations>] [BenchmarkName ...]
+ * ---
  */
 mixin template BenchmarkThisModule()
 {
