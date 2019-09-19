@@ -215,7 +215,7 @@ void seed(/*this*/ RNGSource* rng, long seed)
 		seed = 89482311;
 
 	auto x = cast(int)seed;
-	for (auto i = -20; i < rngLen; i++)
+	foreach (i; -20 .. rngLen)
 	{
 		x = seedRand(x);
 		if (i >= 0)

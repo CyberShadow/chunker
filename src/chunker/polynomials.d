@@ -59,7 +59,7 @@ struct Pol
 			return Pol(0);
 
 		Pol res;
-		for (auto i = 0; i <= y.deg; i++)
+		foreach (i; 0 .. y.deg + 1)
 			if ((y.value & (1L << uint(i))) > 0)
 				res = res + Pol(x.value << uint(i));
 
@@ -226,7 +226,7 @@ struct Pol
 		assert(x.deg == 0,
 			format!"deg(1) is not 0: %s"(x.deg));
 
-		for (auto i = 0; i < 64; i++)
+		foreach (i; 0 .. 64)
 		{
 			x = Pol(1L << uint(i));
 			assert(x.deg == i,
@@ -242,7 +242,7 @@ struct Pol
 			format!"BenchmarkPolDeg: Wrong degree %d returned, expected %d"
 			(d, 41));
 
-		for (auto i = 0; i < Benchmark.N; i++)
+		foreach (i; 0 .. Benchmark.N)
 			f.deg;
 	}
 
@@ -318,7 +318,7 @@ struct Pol
 		auto f = Pol(0x2482734cacca49);
 		auto g = Pol(0x3af4b284899);
 
-		for (auto i = 0; i < Benchmark.N; i++)
+		foreach (i; 0 .. Benchmark.N)
 			divMod(g, f);
 	}
 
@@ -379,7 +379,7 @@ struct Pol
 		auto f = Pol(0x2482734cacca49);
 		auto g = Pol(0x3af4b284899);
 
-		for (auto i = 0; i < Benchmark.N; i++)
+		foreach (i; 0 .. Benchmark.N)
 			g / f;
 	}
 
@@ -438,7 +438,7 @@ struct Pol
 		auto f = Pol(0x2482734cacca49);
 		auto g = Pol(0x3af4b284899);
 
-		for (auto i = 0; i < Benchmark.N; i++)
+		foreach (i; 0 .. Benchmark.N)
 			g % f;
 	}
 
@@ -465,7 +465,7 @@ struct Pol
 
 	version(benchmarkPolynomials) private static void benchmarkPolGetRandom()
 	{
-		for (auto i = 0; i < Benchmark.N; i++)
+		foreach (i; 0 .. Benchmark.N)
 			getRandom();
 	}
 
@@ -478,7 +478,7 @@ struct Pol
 	/// million tries, an error is returned.
 	public static Pol derive(Random)(Random source)
 	{
-		for (auto i = 0; i < randPolMaxTries; i++)
+		foreach (i; 0 .. randPolMaxTries)
 		{
 			Pol f;
 
@@ -598,7 +598,7 @@ struct Pol
 	/// Polynomials over Finite Fields".
 	@property public bool irreducible() const
 	{
-		for (auto i = 1; i <= this.deg/2; i++)
+		foreach (i; 1 .. this.deg/2 + 1)
 			if (gcd(this, qp(uint(i), this)).value != 1)
 				return false;
 
@@ -660,7 +660,7 @@ struct Pol
 				break;
 			}
 
-		for (auto i = 0; i < Benchmark.N; i++)
+		foreach (i; 0 .. Benchmark.N)
 			if (!pol.irreducible)
 				assert(false, format!"Irreducibility test for Polynomial %s failed"(pol));
 	}
@@ -673,11 +673,11 @@ struct Pol
 			return Pol(0);
 
 		Pol res;
-		for (auto i = 0; i <= f.deg; i++)
+		foreach (i; 0 .. f.deg + 1)
 			if ((f.value & (1L << uint(i))) > 0)
 			{
 				auto a = this;
-				for (auto j = 0; j < i; j++)
+				foreach (j; 0 .. i)
 					a = (a * Pol(2)) % g;
 				res = (res + a) % g;
 			}

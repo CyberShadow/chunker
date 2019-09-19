@@ -220,7 +220,7 @@ struct Chunker(R)
 		config.polShift = uint(config.pol.deg() - 8);
 		fillTables();
 
-		for (auto i = 0; i < windowSize; i++)
+		foreach (i; 0 .. windowSize)
 			state.window[i] = 0;
 
 		config.closed = false;
@@ -265,19 +265,19 @@ struct Chunker(R)
 			//  = H(    0     || b_1 || ...     || b_w)
 			//
 			// Afterwards a new byte can be shifted in.
-			for (auto b = 0; b < 256; b++)
+			foreach (b; 0 .. 256)
 			{
 				Pol h;
 
 				h = appendByte(h, cast(ubyte)b, config.pol);
-				for (auto i = 0; i < windowSize-1; i++)
+				foreach (i; 0 .. windowSize-1)
 					h = appendByte(h, 0, config.pol);
 				config.tables.out_[b] = h;
 			}
 
 			// calculate table for reduction mod Polynomial
 			auto k = config.pol.deg();
-			for (auto b = 0; b < 256; b++)
+			foreach (b; 0 .. 256)
 			{
 				// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
 				//
@@ -747,7 +747,7 @@ version (benchmarkChunker)
 		// b.SetBytes(long(size));
 
 		int chunks;
-		for (auto i = 0; i < Benchmark.N; i++)
+		foreach (i; 0 .. Benchmark.N)
 		{
 			chunks = 0;
 
@@ -805,7 +805,7 @@ version (benchmarkChunker)
 
 		Benchmark.resetTimer();
 
-		for (auto i = 0; i < Benchmark.N; i++)
+		foreach (i; 0 .. Benchmark.N)
 			Chunker!File(bufFile(null), p);
 	}
 }

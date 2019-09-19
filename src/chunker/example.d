@@ -16,7 +16,7 @@ void main()
 	// reuse this buffer
 	auto buf = new ubyte[8*1024*1024];
 
-	for (auto i = 0; i < 5; i++)
+	foreach (i; 0 .. 5)
 	{
 		auto chunk = chunker.next(buf);
 		if (chunk is typeof(chunk).init)
