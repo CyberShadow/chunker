@@ -263,7 +263,7 @@ private void reset(/*this*/ Chunker* c)
 private void fillTables(/*this*/ Chunker* c)
 {
 	// if polynomial hasn't been specified, do not compute anything for now
-	if (c.config.pol == 0)
+	if (c.config.pol.value == 0)
 		return;
 
 	c.config.tablesInitialized = true;
@@ -309,7 +309,7 @@ private void fillTables(/*this*/ Chunker* c)
 			// two parts: Part A contains the result of the modulus operation, part
 			// B is used to cancel out the 8 top bits so that one XOR operation is
 			// enough to reduce modulo Polynomial
-			c.config.tables.mod[b] = Pol(ulong(b)<<uint(k)).mod(c.config.pol) | (Pol(b) << uint(k));
+			c.config.tables.mod[b] = Pol((Pol(ulong(b)<<uint(k)) % c.config.pol).value | (Pol.Base(b) << uint(k)));
 		}
 
 		cache.entries[c.config.pol] = c.config.tables;
@@ -395,7 +395,7 @@ public Chunk next(/*this*/ Chunker* c, ubyte[] data)
 			// slide(b)
 			auto out_ = win[wpos];
 			win[wpos] = b;
-			digest ^= ulong(tabout[out_]);
+			digest ^= ulong(tabout[out_].value);
 			wpos++;
 			if (wpos >= windowSize)
 				wpos = 0;
@@ -405,7 +405,7 @@ public Chunk next(/*this*/ Chunker* c, ubyte[] data)
 			digest <<= 8;
 			digest |= ulong(b);
 
-			digest ^= ulong(tabmod[index]);
+			digest ^= ulong(tabmod[index].value);
 			// end manual inline
 
 			add++;
@@ -453,7 +453,7 @@ private ulong /*newDigest*/ updateDigest(ulong digest, uint polShift, Tables tab
 	digest <<= 8;
 	digest |= ulong(b);
 
-	digest ^= ulong(tab.mod[index]);
+	digest ^= ulong(tab.mod[index].value);
 	return digest;
 }
 
@@ -461,7 +461,7 @@ private ulong /*newDigest*/ slide(/*this*/ Chunker* c, ulong digest, ubyte b)
 {
 	auto out_ = c.state.window[c.state.wpos];
 	c.state.window[c.state.wpos] = b;
-	digest ^= ulong(c.config.tables.out_[out_]);
+	digest ^= ulong(c.config.tables.out_[out_].value);
 	c.state.wpos = (c.state.wpos + 1) % windowSize;
 
 	digest = updateDigest(digest, c.config.polShift, c.config.tables, b);
@@ -470,10 +470,10 @@ private ulong /*newDigest*/ slide(/*this*/ Chunker* c, ulong digest, ubyte b)
 
 private Pol appendByte(Pol hash, ubyte b, Pol pol)
 {
-	hash <<= 8;
-	hash |= Pol(b);
+	hash.value <<= 8;
+	hash.value |= Pol.Base(b);
 
-	return hash.mod(pol);
+	return hash % pol;
 }
 
 // -----------------------------------------------------------------------------
@@ -702,7 +702,7 @@ version(unittest) import std.stdio : stderr;
 	// generate a new random polynomial
 	import std.datetime.systime : Clock, SysTime;
 	auto start = Clock.currTime();
-	auto p = RandomPolynomial();
+	auto p = Pol.getRandom();
 	stderr.writefln!"generating random polynomial took %s"(Clock.currTime() - start);
 
 	start = Clock.currTime();
@@ -817,7 +817,7 @@ version (benchmark) @(`BenchmarkChunker`) unittest
 
 version (benchmark) @(`BenchmarkNewChunker`) unittest
 {
-	auto p = RandomPolynomial();
+	auto p = Pol.getRandom();
 
 	// b.ResetTimer();
 
