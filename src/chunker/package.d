@@ -370,32 +370,30 @@ struct Chunker(R)
 			}
 
 			auto add = state.count;
-			auto window = state.hash.window;
-			auto wpos = state.hash.wpos;
-			auto digest = state.hash.digest;
+			auto hash = state.hash;
 			foreach (_, b; buf[state.bpos .. state.bmax])
 			{
 				// slide(b)
-				auto out_ = window[wpos];
-				window[wpos] = b;
-				digest ^= ulong(tabout[out_].value);
-				wpos++;
-				if (wpos >= windowSize)
-					wpos = 0;
+				auto out_ = hash.window[hash.wpos];
+				hash.window[hash.wpos] = b;
+				hash.digest ^= ulong(tabout[out_].value);
+				hash.wpos++;
+				if (hash.wpos >= windowSize)
+					hash.wpos = 0;
 
 				// updateDigest
-				auto index = cast(ubyte)(digest >> polShift);
-				digest <<= 8;
-				digest |= ulong(b);
+				auto index = cast(ubyte)(hash.digest >> polShift);
+				hash.digest <<= 8;
+				hash.digest |= ulong(b);
 
-				digest ^= ulong(tabmod[index].value);
+				hash.digest ^= ulong(tabmod[index].value);
 				// end manual inline
 
 				add++;
 				if (add < minSize)
 					continue;
 
-				if ((digest&config.splitmask) == 0 || add >= maxSize)
+				if ((hash.digest&config.splitmask) == 0 || add >= maxSize)
 				{
 					auto i = add - state.count - 1;
 					data ~= state.buf[state.bpos .. state.bpos+uint(i)+1];
@@ -408,7 +406,7 @@ struct Chunker(R)
 					(
 						/*Start: */ state.start,
 						/*Length:*/ state.count,
-						/*Cut:   */ digest,
+						/*Cut:   */ hash.digest,
 						/*Data:  */ data,
 					);
 
@@ -417,9 +415,7 @@ struct Chunker(R)
 					return chunk;
 				}
 			}
-			state.hash.window = window;
-			state.hash.wpos = wpos;
-			state.hash.digest = digest;
+			state.hash = hash;
 
 			auto steps = state.bmax - state.bpos;
 			if (steps > 0)
