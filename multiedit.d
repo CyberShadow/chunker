@@ -315,7 +315,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 	auto minSize = c.MinSize;
 	auto maxSize = c.MaxSize;
 	auto buf = c.buf;
-	for {
+	while (true) {
 		if (c.bpos >= c.bmax) {
 			n, err := io.ReadFull(c.rd, buf[]);
 
@@ -741,7 +741,7 @@ func benchmarkChunker(testing*.B b, bool checkDigest) {
 		ch.Reset(rd, testPol);
 
 		auto cur = 0;
-		for {
+		while (true) {
 			chunk, err := ch.Next(buf);
 
 			if (err == io.EOF) {
