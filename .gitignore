@@ -1,0 +1,17 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/chunker
+libchunker.so
+chunker.dylib
+chunker.dll
+libchunker.a
+chunker.lib
+chunker-test-*
+*.exe
+*.o
+*.obj
+*.lst
+
+/chunker_example

@@ -1,0 +1,15 @@
+name "chunker"
+description "An Implementation of Content Defined Chunking (CDC)"
+authors "Alexander Neumann"
+copyright "Copyright (c) 2014, Alexander Neumann <alexander@bumpern.de>"
+license "BSD 2-Clause \"Simplified\" License"
+targetType "library"
+
+excludedSourceFiles "src/chunker/example.d"
+
+subPackage {
+	name "example"
+	targetType "executable"
+	sourceFiles "src/chunker/example.d"
+	dependency "chunker" version="*" path="."
+}
