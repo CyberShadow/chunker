@@ -157,7 +157,7 @@ struct Chunker(R)
 		/// Start offset of the current chunk.
 		private size_t start;
 		/// Number of bytes within the current chunk.
-		private size_t count;
+		private @property size_t count() { return pos - start; }
 		/// Current position within the stream.
 		private size_t pos;
 
@@ -250,7 +250,6 @@ struct Chunker(R)
 		config.closed = false;
 		state.digest = 0;
 		state.wpos = 0;
-		state.count = 0;
 		slide(1);
 		state.start = state.pos;
 
@@ -375,7 +374,6 @@ struct Chunker(R)
 					state.pre -= n;
 					data ~= buf[state.bpos .. state.bmax];
 
-					state.count += n;
 					state.pos += n;
 					state.bpos = state.bmax;
 
@@ -385,7 +383,6 @@ struct Chunker(R)
 				data ~= buf[state.bpos .. state.bpos+state.pre];
 
 				state.bpos += state.pre;
-				state.count += state.pre;
 				state.pos += state.pre;
 				state.pre = 0;
 			}
@@ -406,7 +403,6 @@ struct Chunker(R)
 				{
 					auto i = add - state.count - 1;
 					data ~= state.buf[state.bpos .. state.bpos+i+1];
-					state.count = add;
 					state.pos += i + 1;
 					state.bpos += i + 1;
 					state.buf = buf;
@@ -431,7 +427,6 @@ struct Chunker(R)
 			auto steps = state.bmax - state.bpos;
 			if (steps > 0)
 				data ~= state.buf[state.bpos .. state.bpos+steps];
-			state.count += steps;
 			state.pos += steps;
 			state.bpos = state.bmax;
 		}
