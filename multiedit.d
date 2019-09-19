@@ -273,7 +273,7 @@ private void fillTables(/*this*/ Chunker* c) {
 		//
 		// Afterwards a new byte can be shifted in.
 		for (auto b = 0; b < 256; b++) {
-			var h Pol;
+			Pol h;
 
 			h = appendByte(h, ubyte(b), c.pol);
 			for (auto i = 0; i < windowSize-1; i++) {
@@ -729,7 +729,7 @@ func benchmarkChunker(testing*.B b, bool checkDigest) {
 	b.ResetTimer();
 	b.SetBytes(long(size));
 
-	var chunks int;
+	int chunks;
 	for (auto i = 0; i < b.N; i++) {
 		chunks = 0;
 
@@ -866,7 +866,7 @@ private Pol mul(/*this*/ Pol x, Pol y) {
 		return 0;
 	}
 
-	var res Pol;
+	Pol res;
 	for (auto i = 0; i <= y.Deg(); i++) {
 		if ((y & (1 << uint(i))) > 0) {
 			res = res.Add(x << uint(i));
@@ -973,7 +973,7 @@ public void DivMod(/*this*/ Pol x, Pol d) (Pol, Pol) {
 		return 0, x;
 	}
 
-	var q Pol;
+	Pol q;
 	while (diff >= 0) {
 		auto m = d << uint(diff);
 		q |= (1 << uint(diff));
@@ -1018,7 +1018,7 @@ public (Pol, error) RandomPolynomial() {
 /// million tries, an error is returned.
 public (Pol, error) DerivePolynomial(io.Reader source) {
 	for (auto i = 0; i < randPolMaxTries; i++) {
-		var f Pol;
+		Pol f;
 
 		// choose polynomial at (pseudo)random
 		auto err = binary.Read(source, binary.LittleEndian, &f);
@@ -1082,7 +1082,7 @@ public Pol MulMod(/*this*/ Pol x, Pol f, Pol g) {
 		return 0;
 	}
 
-	var res Pol;
+	Pol res;
 	for (auto i = 0; i <= f.Deg(); i++) {
 		if ((f & (1 << uint(i))) > 0) {
 			auto a = x;
@@ -1285,7 +1285,7 @@ func TestPolDiv(testing*.T t) {
 }
 
 func TestPolDeg(testing*.T t) {
-	var x Pol;
+	Pol x;
 	if (x.Deg() != -1) {
 		t.Errorf("deg(0) is not -1: %v", x.Deg());
 	}
@@ -1446,7 +1446,7 @@ func TestPolIrreducible(testing*.T t) {
 
 func BenchmarkPolIrreducible(testing*.B b) {
 	// find first irreducible polynomial
-	var pol Pol;
+	Pol pol;
 	foreach (_, test; polIrredTests) {
 		if (test.irred) {
 			pol = test.f;
