@@ -25,32 +25,24 @@ mixin template BenchmarkThisModule()
 	struct Benchmark
 	{
 	static:
-		immutable ulong N;
+		immutable ulong iterations;
 		private immutable string[] benchmarks;
 
 		shared static this()
 		{
 			import core.runtime : Runtime;
 			import std.getopt : getopt;
-			ulong N = 1;
+			ulong n = 1;
 			auto args = Runtime.args;
 			getopt(args,
-				"N", &N,
+				"N", &n,
 			);
-			Benchmark.N = N;
+			Benchmark.iterations = n;
 
 			auto benchmarks = args[1..$].idup;
 			if (!benchmarks.length)
 				benchmarks = ["*"];
 			Benchmark.benchmarks = benchmarks;
-		}
-
-		import std.datetime.stopwatch : StopWatch;
-		private StopWatch sw;
-
-		void resetTimer()
-		{
-			sw.reset();
 		}
 
 		private void run()
@@ -78,15 +70,38 @@ mixin template BenchmarkThisModule()
 								continue;
 
 							stderr.writefln("Running benchmark %s.%s (%d iterations):",
-								__traits(identifier, mod), name[9..$], N);
-							sw.reset();
-							sw.start();
+								__traits(identifier, mod), name[9..$], iterations);
+							best = Duration.max;
+							benchmarked = false;
 							member();
-							auto time = sw.peek();
-							stderr.writefln("  -> %s", time);
+							assert(benchmarked, "No block was benchmarked during this benchmark.");
+							stderr.writefln("  -> %s", best);
 						}
 					}
 				}
+		}
+
+		import std.datetime.stopwatch : StopWatch;
+		import core.time : Duration;
+
+		private Duration best;
+		private bool benchmarked;
+
+		void benchmark(void delegate() dg)
+		{
+			assert(!benchmarked, "A block was already benchmarked during this benchmark.");
+			benchmarked = true;
+
+			StopWatch sw;
+			foreach (iteration; 0 .. iterations)
+			{
+				sw.start();
+				dg();
+				sw.stop();
+				if (best > sw.peek())
+					best = sw.peek();
+				sw.reset();
+			}
 		}
 	}
 }

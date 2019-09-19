@@ -489,8 +489,8 @@ package ubyte[32] hashData(ubyte[] d)
 import std.stdio : File;
 package File bufFile(ubyte[] buf)
 {
-	File("temp.bin", "wb").rawWrite(buf);
-	return File("temp.bin", "rb");
+	File("/tmp/temp.bin", "wb").rawWrite(buf);
+	return File("/tmp/temp.bin", "rb");
 }
 
 // -----------------------------------------------------------------------------
@@ -743,12 +743,10 @@ version (benchmarkChunker)
 		auto ch = Chunker!File(rd, testPol);
 		auto buf = new ubyte[maxSize];
 
-		Benchmark.resetTimer();
 		// b.SetBytes(long(size));
 
 		int chunks;
-		foreach (i; 0 .. Benchmark.N)
-		{
+		Benchmark.benchmark({
 			chunks = 0;
 
 			rd.seek(0);
@@ -784,7 +782,7 @@ version (benchmarkChunker)
 				chunks++;
 				cur++;
 			}
-		}
+		});
 
 		stderr.writefln!"%d chunks, average chunk size: %d bytes"(chunks, size/chunks);
 	}
@@ -803,9 +801,8 @@ version (benchmarkChunker)
 	{
 		auto p = Pol.getRandom();
 
-		Benchmark.resetTimer();
-
-		foreach (i; 0 .. Benchmark.N)
+		Benchmark.benchmark({
 			Chunker!File(bufFile(null), p);
+		});
 	}
 }
