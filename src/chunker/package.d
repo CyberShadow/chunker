@@ -156,7 +156,7 @@ struct Chunker(R)
 
 	private struct Config
 	{
-		public uint minSize, maxSize;
+		public size_t minSize, maxSize;
 
 		private Pol pol;
 		private uint polShift;
@@ -175,9 +175,9 @@ struct Chunker(R)
 	/// `averageBits`, the higher amount of chunks will be identified.
 	/// The default value is 20 bits, so chunks will be of 1MiB size
 	/// on average.
-	public void setAverageBits(int averageBits)
+	public void setAverageBits(uint averageBits)
 	{
-		config.splitmask = (1 << ulong(averageBits)) - 1;
+		config.splitmask = (1L << averageBits) - 1;
 	}
 
 	/// Constructs a new `Chunker` based on polynomial `pol` that
@@ -189,9 +189,9 @@ struct Chunker(R)
 
 	/// Constructs a new `Chunker` based on polynomial `pol` that
 	/// reads from `rd` and custom `min` and `max` size boundaries.
-	public this(R rd, Pol pol, uint min, uint max)
+	public this(R rd, Pol pol, size_t min, size_t max)
 	{
-		resetWithBoundaries(rd, pol, minSize, maxSize);
+		resetWithBoundaries(rd, pol, min, max);
 	}
 
 	/// Reinitializes the `Chunker` with a new reader and polynomial.
@@ -202,7 +202,7 @@ struct Chunker(R)
 
 	/// Reinitializes the `Chunker` with a new reader, polynomial and
 	/// custom min and max size boundaries.
-	public void resetWithBoundaries(R rd, Pol pol, uint min, uint max)
+	public void resetWithBoundaries(R rd, Pol pol, size_t min, size_t max)
 	{
 		state = State();
 		state.buf = new ubyte[chunkerBufSize];
@@ -286,7 +286,9 @@ struct Chunker(R)
 				// two parts: Part A contains the result of the modulus operation, part
 				// B is used to cancel out the 8 top bits so that one XOR operation is
 				// enough to reduce modulo Polynomial
-				config.tables.mod[b] = Pol((Pol(ulong(b)<<uint(k)) % config.pol).value | (Pol.Base(b) << uint(k)));
+				config.tables.mod[b] = Pol(
+					(Pol(Pol.Base(b) << uint(k)) % config.pol).value |
+					    (Pol.Base(b) << uint(k)));
 			}
 
 			cache.entries[config.pol] = config.tables;
@@ -337,7 +339,7 @@ struct Chunker(R)
 					return Chunk.init;
 
 				state.bpos = 0;
-				state.bmax = cast(uint)n;
+				state.bmax = n;
 			}
 
 			// check if bytes have to be dismissed before starting a new chunk
@@ -500,7 +502,7 @@ private template parseDigest(string s)
 
 private struct TestChunk
 {
-	public uint length;
+	public size_t length;
 	public ulong cutFP;
 	public ubyte[] digest;
 }
@@ -592,7 +594,7 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 {
 	Chunker!R.Chunk[] chunks;
 
-	auto pos = uint(0);
+	size_t pos = 0;
 	foreach (i, chunk; testChunks)
 	{
 		auto c = chnker.next(null);
