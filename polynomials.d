@@ -32,7 +32,7 @@ private Pol mul(/*this*/ Pol x, Pol y) {
 
 	Pol res;
 	for (auto i = 0; i <= y.Deg(); i++) {
-		if ((y & (1 << uint(i))) > 0) {
+		if ((y & (1L << uint(i))) > 0) {
 			res = res.Add(x << uint(i));
 		}
 	}
@@ -107,7 +107,7 @@ public string Expand(/*this*/ Pol x) {
 
 	auto s = "";
 	for (auto i = x.Deg(); i > 1; i--) {
-		if ((x&(1<<uint(i))) > 0) {
+		if ((x&(1L<<uint(i))) > 0) {
 			s ~= format!"+x^%d"(i);
 		}
 	}
@@ -143,7 +143,7 @@ public Pol[2] DivMod(/*this*/ Pol x, Pol d) {
 	Pol q;
 	while (diff >= 0) {
 		auto m = d << uint(diff);
-		q |= (1 << uint(diff));
+		q |= (1L << uint(diff));
 		x = x.Add(m);
 
 		diff = x.Deg() - D;
@@ -251,7 +251,7 @@ public Pol MulMod(/*this*/ Pol x, Pol f, Pol g) {
 
 	Pol res;
 	for (auto i = 0; i <= f.Deg(); i++) {
-		if ((f & (1 << uint(i))) > 0) {
+		if ((f & (1L << uint(i))) > 0) {
 			auto a = x;
 			for (auto j = 0; j < i; j++) {
 				a = a.Mul(2).Mod(g);
@@ -266,7 +266,7 @@ public Pol MulMod(/*this*/ Pol x, Pol f, Pol g) {
 /// qp computes the polynomial (x^(2^p)-x) mod g. This is needed for the
 /// reducibility test.
 private Pol qp(uint p, Pol g) {
-	auto num = (1 << p);
+	auto num = (1L << p);
 	auto i = 1;
 
 	// start with x
