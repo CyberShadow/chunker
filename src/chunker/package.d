@@ -743,12 +743,10 @@ version (benchmarkChunker)
 		auto ch = Chunker!File(rd, testPol);
 		auto buf = new ubyte[maxSize];
 
-		Benchmark.resetTimer();
 		// b.SetBytes(long(size));
 
 		int chunks;
-		foreach (i; 0 .. Benchmark.N)
-		{
+		Benchmark.benchmark({
 			chunks = 0;
 
 			rd.seek(0);
@@ -784,7 +782,7 @@ version (benchmarkChunker)
 				chunks++;
 				cur++;
 			}
-		}
+		});
 
 		stderr.writefln!"%d chunks, average chunk size: %d bytes"(chunks, size/chunks);
 	}
@@ -803,9 +801,8 @@ version (benchmarkChunker)
 	{
 		auto p = Pol.getRandom();
 
-		Benchmark.resetTimer();
-
-		foreach (i; 0 .. Benchmark.N)
+		Benchmark.benchmark({
 			Chunker!File(bufFile(null), p);
+		});
 	}
 }

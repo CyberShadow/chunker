@@ -242,8 +242,9 @@ struct Pol
 			format!"BenchmarkPolDeg: Wrong degree %d returned, expected %d"
 			(d, 41));
 
-		foreach (i; 0 .. Benchmark.N)
+		Benchmark.benchmark({
 			f.deg;
+		});
 	}
 
 
@@ -318,8 +319,9 @@ struct Pol
 		auto f = Pol(0x2482734cacca49);
 		auto g = Pol(0x3af4b284899);
 
-		foreach (i; 0 .. Benchmark.N)
+		Benchmark.benchmark({
 			divMod(g, f);
+		});
 	}
 
 
@@ -379,8 +381,9 @@ struct Pol
 		auto f = Pol(0x2482734cacca49);
 		auto g = Pol(0x3af4b284899);
 
-		foreach (i; 0 .. Benchmark.N)
+		Benchmark.benchmark({
 			g / f;
+		});
 	}
 
 
@@ -438,8 +441,9 @@ struct Pol
 		auto f = Pol(0x2482734cacca49);
 		auto g = Pol(0x3af4b284899);
 
-		foreach (i; 0 .. Benchmark.N)
+		Benchmark.benchmark({
 			g % f;
+		});
 	}
 
 
@@ -465,8 +469,9 @@ struct Pol
 
 	version(benchmarkPolynomials) private static void benchmarkPolGetRandom()
 	{
-		foreach (i; 0 .. Benchmark.N)
+		Benchmark.benchmark({
 			getRandom();
+		});
 	}
 
 
@@ -660,9 +665,10 @@ struct Pol
 				break;
 			}
 
-		foreach (i; 0 .. Benchmark.N)
+		Benchmark.benchmark({
 			if (!pol.irreducible)
 				assert(false, format!"Irreducibility test for Polynomial %s failed"(pol));
+		});
 	}
 
 
