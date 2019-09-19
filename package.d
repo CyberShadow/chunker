@@ -245,9 +245,7 @@ private void reset(/*this*/ Chunker* c)
 	c.fillTables();
 
 	for (auto i = 0; i < windowSize; i++)
-	{
 		c.state.window[i] = 0;
-	}
 
 	c.config.closed = false;
 	c.state.digest = 0;
@@ -266,9 +264,7 @@ private void fillTables(/*this*/ Chunker* c)
 {
 	// if polynomial hasn't been specified, do not compute anything for now
 	if (c.config.pol == 0)
-	{
 		return;
-	}
 
 	c.config.tablesInitialized = true;
 
@@ -298,9 +294,7 @@ private void fillTables(/*this*/ Chunker* c)
 
 			h = appendByte(h, cast(ubyte)b, c.config.pol);
 			for (auto i = 0; i < windowSize-1; i++)
-			{
 				h = appendByte(h, 0, c.config.pol);
-			}
 			c.config.tables.out_[b] = h;
 		}
 
@@ -330,9 +324,7 @@ public Chunk Next(/*this*/ Chunker* c, ubyte[] data)
 {
 	data = data[0..0];
 	if (!c.config.tablesInitialized)
-	{
 		throw new Exception("tables for polynomial computation not initialized");
-	}
 
 	auto tabout = c.config.tables.out_;
 	auto tabmod = c.config.tables.mod;
@@ -354,7 +346,6 @@ public Chunk Next(/*this*/ Chunker* c, ubyte[] data)
 
 				// return current chunk, if any bytes have been processed
 				if (c.state.count > 0)
-				{
 					return Chunk
 					(
 						/*Start: */ c.state.start,
@@ -362,7 +353,6 @@ public Chunk Next(/*this*/ Chunker* c, ubyte[] data)
 						/*Cut:   */ c.state.digest,
 						/*Data:  */ data,
 					);
-				}
 			}
 
 			if (n == 0)
@@ -408,9 +398,7 @@ public Chunk Next(/*this*/ Chunker* c, ubyte[] data)
 			digest ^= ulong(tabout[out_]);
 			wpos++;
 			if (wpos >= windowSize)
-			{
 				wpos = 0;
-			}
 
 			// updateDigest
 			auto index = cast(ubyte)(digest >> polShift);
@@ -422,9 +410,7 @@ public Chunk Next(/*this*/ Chunker* c, ubyte[] data)
 
 			add++;
 			if (add < minSize)
-			{
 				continue;
-			}
 
 			if ((digest&c.config.splitmask) == 0 || add >= maxSize)
 			{
@@ -454,9 +440,7 @@ public Chunk Next(/*this*/ Chunker* c, ubyte[] data)
 
 		auto steps = c.state.bmax - c.state.bpos;
 		if (steps > 0)
-		{
 			data ~= c.state.buf[c.state.bpos .. c.state.bpos+steps];
-		}
 		c.state.count += steps;
 		c.state.pos += steps;
 		c.state.bpos = c.state.bmax;
@@ -638,32 +622,24 @@ version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChun
 	{
 		auto c = chnker.Next(null);
 
-		if (c.Start != pos)
-		{
-			assert(false, format!"Start for chunk %d does not match: expected %d, got %d"
-				(i, pos, c.Start));
-		}
+		assert(c.Start == pos,
+			format!"Start for chunk %d does not match: expected %d, got %d"
+			(i, pos, c.Start));
 
-		if (c.Length != chunk.Length)
-		{
-			assert(false, format!"Length for chunk %d does not match: expected %d, got %d"
-				(i, chunk.Length, c.Length));
-		}
+		assert(c.Length == chunk.Length,
+			format!"Length for chunk %d does not match: expected %d, got %d"
+			(i, chunk.Length, c.Length));
 
-		if (c.Cut != chunk.CutFP)
-		{
-			assert(false, format!"Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x"
-				(i, testChunks.length-1, chunk.CutFP, c.Cut));
-		}
+		assert(c.Cut == chunk.CutFP,
+			format!"Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x"
+			(i, testChunks.length-1, chunk.CutFP, c.Cut));
 
 		if (checkDigest)
 		{
 			auto digest = hashData(c.Data);
-			if (!(chunk.Digest == digest))
-			{
-				assert(false, format!"Digest fingerprint for chunk %d/%d does not match: expected %(%02x%), got %(%02x%)"
-					(i, testChunks.length-1, chunk.Digest, digest));
-			}
+			assert(chunk.Digest == digest,
+				format!"Digest fingerprint for chunk %d/%d does not match: expected %(%02x%), got %(%02x%)"
+				(i, testChunks.length-1, chunk.Digest, digest));
 		}
 
 		pos += c.Length;
@@ -672,14 +648,10 @@ version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChun
 
 	auto c = chnker.Next(null);
 	if (c !is Chunk.init)
-	{
 		assert(false, "Wrong error returned after last chunk");
-	}
 
-	if (chunks.length != testChunks.length)
-	{
-		assert(false, "Amounts of test and resulting chunks do not match");
-	}
+	assert(chunks.length == testChunks.length,
+		"Amounts of test and resulting chunks do not match");
 
 	return chunks;
 }
@@ -740,20 +712,14 @@ version(unittest) import std.stdio : stderr;
 	// make sure that first chunk is different
 	auto c = ch.Next(null);
 
-	if (c.Cut == chunks1[0].CutFP)
-	{
-		assert(false, "Cut point is the same");
-	}
+	assert(c.Cut != chunks1[0].CutFP,
+		"Cut point is the same");
 
-	if (c.Length == chunks1[0].Length)
-	{
-		assert(false, "Length is the same");
-	}
+	assert(c.Length != chunks1[0].Length,
+		"Length is the same");
 
-	if (hashData(c.Data) == chunks1[0].Digest)
-	{
-		assert(false, "Digest is the same");
-	}
+	assert(hashData(c.Data) != chunks1[0].Digest,
+		"Digest is the same");
 }
 
 @(`ChunkerWithoutHash`) unittest
@@ -767,17 +733,13 @@ version(unittest) import std.stdio : stderr;
 	// test reader
 	foreach (i, c; chunks)
 	{
-		if (c.Data.length != chunks1[i].Length)
-		{
-			assert(false, format!"reader returned wrong number of bytes: expected %d, got %d"
-				(chunks1[i].Length, c.Data.length));
-		}
+		assert(c.Data.length == chunks1[i].Length,
+			format!"reader returned wrong number of bytes: expected %d, got %d"
+			(chunks1[i].Length, c.Data.length));
 
-		if (!(buf[c.Start .. c.Start+c.Length] == c.Data))
-		{
-			assert(false, format!"invalid data for chunk returned: expected %(%02x%), got %(%02x%)"
-				(buf[c.Start .. c.Start+c.Length], c.Data));
-		}
+		assert(buf[c.Start .. c.Start+c.Length] == c.Data,
+			format!"invalid data for chunk returned: expected %(%02x%), got %(%02x%)"
+			(buf[c.Start .. c.Start+c.Length], c.Data));
 	}
 
 	// setup nullbyte data source
@@ -819,29 +781,20 @@ version (benchmark) void benchmarkChunker(bool checkDigest)
 				break;
 			}
 
-			if (chunk.Length != chunks1[cur].Length)
-			{
-				assert(false, format!"wrong chunk length, want %d, got %d"
-				(
-					chunks1[cur].Length, chunk.Length));
-			}
+			assert(chunk.Length == chunks1[cur].Length,
+				format!"wrong chunk length, want %d, got %d"
+				(chunks1[cur].Length, chunk.Length));
 
-			if (chunk.Cut != chunks1[cur].CutFP)
-			{
-				assert(false, format!"wrong cut fingerprint, want 0x%x, got 0x%x"
-				(
-					chunks1[cur].CutFP, chunk.Cut));
-			}
+			assert(chunk.Cut == chunks1[cur].CutFP,
+				format!"wrong cut fingerprint, want 0x%x, got 0x%x"
+				(chunks1[cur].CutFP, chunk.Cut));
 
 			if (checkDigest)
 			{
 				auto h = hashData(chunk.Data);
-				if (!(h == chunks1[cur].Digest))
-				{
-					assert(false, format!"wrong digest, want %(%02x%), got %(%02x%)"
-					(
-						chunks1[cur].Digest, h));
-				}
+				assert(h == chunks1[cur].Digest,
+					format!"wrong digest, want %(%02x%), got %(%02x%)"
+					(chunks1[cur].Digest, h));
 			}
 
 			chunks++;

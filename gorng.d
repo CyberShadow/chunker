@@ -198,9 +198,7 @@ int seedrand(int x)
 	auto lo = x % Q;
 	x = A*lo - R*hi;
 	if (x < 0)
-	{
 		x += int32max;
-	}
 	return x;
 }
 
@@ -212,13 +210,9 @@ void Seed(/*this*/ rngSource* rng, long seed)
 
 	seed = seed % int32max;
 	if (seed < 0)
-	{
 		seed += int32max;
-	}
 	if (seed == 0)
-	{
 		seed = 89482311;
-	}
 
 	auto x = cast(int)seed;
 	for (auto i = -20; i < rngLen; i++)
@@ -249,15 +243,11 @@ ulong Uint64(/*this*/ rngSource* rng)
 {
 	rng.tap--;
 	if (rng.tap < 0)
-	{
 		rng.tap += rngLen;
-	}
 
 	rng.feed--;
 	if (rng.feed < 0)
-	{
 		rng.feed += rngLen;
-	}
 
 	auto x = rng.vec[rng.feed] + rng.vec[rng.tap];
 	rng.vec[rng.feed] = x;

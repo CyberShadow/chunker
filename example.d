@@ -20,9 +20,7 @@ void main()
 	{
 		auto chunk = chunker.Next(buf);
 		if (chunk is Chunk.init)
-		{
 			break;
-		}
 
 		writefln!"%d %(%02x%)"(chunk.Length, sha256Of(chunk.Data));
 	}
