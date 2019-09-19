@@ -130,41 +130,65 @@ struct Chunker(R)
 	/// the Rabin Fingerprint had the value stored in `cut`.
 	public struct Chunk
 	{
+		/// Offset within the source data for the start of the chunk.
 		public size_t start;
+		/// Length of the chunk.
 		public size_t length;
+		/// Value of the rolling hash when the chunk was cut.
 		public ulong cut;
+		/// Contents of the chunk.
 		public ubyte[] data;
 	}
 
 	private struct State
 	{
+		/// Current contents of the sliding window.
 		private ubyte[windowSize] window;
+		/// Sliding window cursor.
 		private size_t wpos;
 
+		/// Buffer used to receive and keep read data in.
 		private ubyte[] buf;
+		/// Current read position within `buf`.
 		private size_t bpos;
+		/// Number of bytes of data in `buf`.
 		private size_t bmax;
 
+		/// Start offset of the current chunk.
 		private size_t start;
+		/// Number of bytes within the current chunk.
 		private size_t count;
+		/// Current position within the stream.
 		private size_t pos;
 
-		private size_t pre; /// wait for this many bytes before start calculating an new chunk
+		/// Skip this many bytes before calculating a new chunk.
+		private size_t pre;
 
+		/// Current hash digest value.
 		private ulong digest;
 	}
 
 	private struct Config
 	{
+		/// Minimum and maximum chunk sizes, as configured.
 		public size_t minSize, maxSize;
 
+		/// Polynomial to use when calculating the hash.
 		private Pol pol;
+		/// Bits to shift the digest when updating the hash.
+		/// Calculated from the polynomial's degree.
 		private uint polShift;
+		/// Precomputed tables used for hashing.
 		private Tables tables;
+		/// Whether `tables` have already been computed.
 		private bool tablesInitialized;
+		/// Hash mask used to decide chunk boundaries.
+		/// By default `(1 << 20) - 1`, or configured from `setAverageBits`.
 		private ulong splitmask;
 
+		/// Input data source.
 		private R rd;
+		/// Whether we've read all data from the source.
 		private bool closed;
 	}
 
