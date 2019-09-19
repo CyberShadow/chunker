@@ -1,7 +1,6 @@
 module chunker.example;
 
 import chunker;
-import chunker.chunker_test;
 import chunker.polynomials;
 
 void main()
