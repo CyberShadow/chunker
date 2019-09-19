@@ -180,7 +180,7 @@ immutable long[rngLen] rngCooked =
 		8382142935188824023, 9103922860780351547, 4152330101494654406,
 ];
 
-struct rngSource
+struct RNGSource
 {
 	int tap;           // index into vec
 	int feed;          // index into vec
@@ -188,7 +188,7 @@ struct rngSource
 }
 
 // seed rng x[n+1] = 48271 * x[n] mod (2**31 - 1)
-int seedrand(int x)
+int seedRand(int x)
 {
 	enum A = 48271;
 	enum Q = 44488;
@@ -202,8 +202,8 @@ int seedrand(int x)
 	return x;
 }
 
-// Seed uses the provided seed value to initialize the generator to a deterministic state.
-void Seed(/*this*/ rngSource* rng, long seed)
+// seed uses the provided seed value to initialize the generator to a deterministic state.
+void seed(/*this*/ RNGSource* rng, long seed)
 {
 	rng.tap = 0;
 	rng.feed = rngLen - rngTap;
@@ -217,14 +217,14 @@ void Seed(/*this*/ rngSource* rng, long seed)
 	auto x = cast(int)seed;
 	for (auto i = -20; i < rngLen; i++)
 	{
-		x = seedrand(x);
+		x = seedRand(x);
 		if (i >= 0)
 		{
 			long u;
 			u = long(x) << 40;
-			x = seedrand(x);
+			x = seedRand(x);
 			u ^= long(x) << 20;
-			x = seedrand(x);
+			x = seedRand(x);
 			u ^= long(x);
 			u ^= rngCooked[i];
 			rng.vec[i] = u;
@@ -232,14 +232,14 @@ void Seed(/*this*/ rngSource* rng, long seed)
 	}
 }
 
-// Int63 returns a non-negative pseudo-random 63-bit integer as an long.
-long Int63(/*this*/ rngSource* rng)
+// int63 returns a non-negative pseudo-random 63-bit integer as an long.
+long int63(/*this*/ RNGSource* rng)
 {
-	return long(rng.Uint64() & rngMask);
+	return long(rng.uint64() & rngMask);
 }
 
-// Uint64 returns a non-negative pseudo-random 64-bit integer as an uint64.
-ulong Uint64(/*this*/ rngSource* rng)
+// uint64 returns a non-negative pseudo-random 64-bit integer as an uint64.
+ulong uint64(/*this*/ RNGSource* rng)
 {
 	rng.tap--;
 	if (rng.tap < 0)

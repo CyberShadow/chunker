@@ -93,15 +93,15 @@ private enum miB = 1024 * kiB;
 /// WindowSize is the size of the sliding window.
 private enum windowSize = 64;
 
-/// MinSize is the default minimal size of a chunk.
-public enum MinSize = 512 * kiB;
-/// MaxSize is the default maximal size of a chunk.
-public enum MaxSize = 8 * miB;
+/// minSize is the default minimal size of a chunk.
+public enum minSize = 512 * kiB;
+/// maxSize is the default maximal size of a chunk.
+public enum maxSize = 8 * miB;
 
 private enum chunkerBufSize = 512 * kiB;
 
 
-private struct tables
+private struct Tables
 {
 	private Pol[256] out_;
 	private Pol[256] mod;
@@ -111,7 +111,7 @@ private struct tables
 private struct cache
 {
 static:
-	tables[Pol] entries;
+	Tables[Pol] entries;
 	Object mutex;
 }
 
@@ -124,13 +124,13 @@ static this()
 /// Rabin Fingerprint had the value stored in Cut.
 public struct Chunk
 {
-	public uint Start;
-	public uint Length;
-	public ulong Cut;
-	public ubyte[] Data;
+	public uint start;
+	public uint length;
+	public ulong cut;
+	public ubyte[] data;
 }
 
-private struct chunkerState
+private struct ChunkerState
 {
 	private ubyte[windowSize] window;
 	private int wpos;
@@ -148,13 +148,13 @@ private struct chunkerState
 	private ulong digest;
 }
 
-private struct chunkerConfig
+private struct ChunkerConfig
 {
-	public uint MinSize, MaxSize;
+	public uint minSize, maxSize;
 
 	private Pol pol;
 	private uint polShift;
-	private .tables tables;
+	private Tables tables;
 	private bool tablesInitialized;
 	private ulong splitmask;
 
@@ -165,27 +165,27 @@ private struct chunkerConfig
 /// Chunker splits content with Rabin Fingerprints.
 public struct Chunker
 {
-	.chunkerConfig config;
-	.chunkerState state;
+	ChunkerConfig config;
+	ChunkerState state;
 }
 
-/// SetAverageBits allows to control the frequency of chunk discovery:
+/// setAverageBits allows to control the frequency of chunk discovery:
 /// the lower averageBits, the higher amount of chunks will be identified.
 /// The default value is 20 bits, so chunks will be of 1MiB size on average.
-public void SetAverageBits(/*this*/ Chunker* c, int averageBits)
+public void setAverageBits(/*this*/ Chunker* c, int averageBits)
 {
 	c.config.splitmask = (1 << ulong(averageBits)) - 1;
 }
 
-/// New returns a new Chunker based on polynomial p that reads from rd.
-public Chunker* New(File rd, Pol pol)
+/// newChunker returns a new Chunker based on polynomial p that reads from rd.
+public Chunker* newChunker(File rd, Pol pol)
 {
-	return NewWithBoundaries(rd, pol, MinSize, MaxSize);
+	return newChunkerWithBoundaries(rd, pol, minSize, maxSize);
 }
 
-/// NewWithBoundaries returns a new Chunker based on polynomial p that reads from
+/// newChunkerWithBoundaries returns a new Chunker based on polynomial p that reads from
 /// rd and custom min and max size boundaries.
-public Chunker* NewWithBoundaries(File rd, Pol pol, uint min, uint max)
+public Chunker* newChunkerWithBoundaries(File rd, Pol pol, uint min, uint max)
 {
 	Chunker v =
 	{
@@ -197,8 +197,8 @@ public Chunker* NewWithBoundaries(File rd, Pol pol, uint min, uint max)
 		{
 			pol:       pol,
 			rd:        rd,
-			MinSize:   min,
-			MaxSize:   max,
+			minSize:   min,
+			maxSize:   max,
 			splitmask: (1 << 20) - 1, // aim to create chunks of 20 bits or about 1MiB on average.
 		},
 	};
@@ -209,15 +209,15 @@ public Chunker* NewWithBoundaries(File rd, Pol pol, uint min, uint max)
 	return c;
 }
 
-/// Reset reinitializes the chunker with a new reader and polynomial.
-public void Reset(/*this*/ Chunker* c, File rd, Pol pol)
+/// reset reinitializes the chunker with a new reader and polynomial.
+public void reset(/*this*/ Chunker* c, File rd, Pol pol)
 {
-	c.ResetWithBoundaries(rd, pol, MinSize, MaxSize);
+	c.resetWithBoundaries(rd, pol, minSize, maxSize);
 }
 
 /// ResetWithBoundaries reinitializes the chunker with a new reader, polynomial
 /// and custom min and max size boundaries.
-public void ResetWithBoundaries(/*this*/ Chunker* c, File rd, Pol pol, uint min, uint max)
+public void resetWithBoundaries(/*this*/ Chunker* c, File rd, Pol pol, uint min, uint max)
 {
 	Chunker v =
 	{
@@ -229,8 +229,8 @@ public void ResetWithBoundaries(/*this*/ Chunker* c, File rd, Pol pol, uint min,
 		{
 			pol:       pol,
 			rd:        rd,
-			MinSize:   min,
-			MaxSize:   max,
+			minSize:   min,
+			maxSize:   max,
 			splitmask: (1 << 20) - 1, // aim to create chunks of 20 bits or about 1MiB on average.
 		},
 	};
@@ -241,7 +241,7 @@ public void ResetWithBoundaries(/*this*/ Chunker* c, File rd, Pol pol, uint min,
 
 private void reset(/*this*/ Chunker* c)
 {
-	c.config.polShift = uint(c.config.pol.Deg() - 8);
+	c.config.polShift = uint(c.config.pol.deg() - 8);
 	c.fillTables();
 
 	for (auto i = 0; i < windowSize; i++)
@@ -254,8 +254,8 @@ private void reset(/*this*/ Chunker* c)
 	c.state.digest = c.slide(c.state.digest, 1);
 	c.state.start = c.state.pos;
 
-	// do not start a new chunk unless at least MinSize bytes have been read
-	c.state.pre = c.config.MinSize - windowSize;
+	// do not start a new chunk unless at least minSize bytes have been read
+	c.state.pre = c.config.minSize - windowSize;
 }
 
 /// fillTables calculates out_table and mod_table for optimization. This
@@ -299,7 +299,7 @@ private void fillTables(/*this*/ Chunker* c)
 		}
 
 		// calculate table for reduction mod Polynomial
-		auto k = c.config.pol.Deg();
+		auto k = c.config.pol.deg();
 		for (auto b = 0; b < 256; b++)
 		{
 			// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
@@ -309,18 +309,18 @@ private void fillTables(/*this*/ Chunker* c)
 			// two parts: Part A contains the result of the modulus operation, part
 			// B is used to cancel out the 8 top bits so that one XOR operation is
 			// enough to reduce modulo Polynomial
-			c.config.tables.mod[b] = Pol(ulong(b)<<uint(k)).Mod(c.config.pol) | (Pol(b) << uint(k));
+			c.config.tables.mod[b] = Pol(ulong(b)<<uint(k)).mod(c.config.pol) | (Pol(b) << uint(k));
 		}
 
 		cache.entries[c.config.pol] = c.config.tables;
 	}
 }
 
-/// Next returns the position and length of the next chunk of data. If an error
+/// next returns the position and length of the next chunk of data. If an error
 /// occurs while reading, the error is returned. Afterwards, the state of the
 /// current chunk is undefined. When the last chunk has been returned, all
 /// subsequent calls yield an io.EOF error.
-public Chunk Next(/*this*/ Chunker* c, ubyte[] data)
+public Chunk next(/*this*/ Chunker* c, ubyte[] data)
 {
 	data = data[0..0];
 	if (!c.config.tablesInitialized)
@@ -329,8 +329,8 @@ public Chunk Next(/*this*/ Chunker* c, ubyte[] data)
 	auto tabout = c.config.tables.out_;
 	auto tabmod = c.config.tables.mod;
 	auto polShift = c.config.polShift;
-	auto minSize = c.config.MinSize;
-	auto maxSize = c.config.MaxSize;
+	auto minSize = c.config.minSize;
+	auto maxSize = c.config.maxSize;
 	auto buf = c.state.buf;
 	while (true)
 	{
@@ -447,7 +447,7 @@ public Chunk Next(/*this*/ Chunker* c, ubyte[] data)
 	}
 }
 
-private ulong /*newDigest*/ updateDigest(ulong digest, uint polShift, tables tab, ubyte b)
+private ulong /*newDigest*/ updateDigest(ulong digest, uint polShift, Tables tab, ubyte b)
 {
 	auto index = digest >> polShift;
 	digest <<= 8;
@@ -473,7 +473,7 @@ private Pol appendByte(Pol hash, ubyte b, Pol pol)
 	hash <<= 8;
 	hash |= Pol(b);
 
-	return hash.Mod(pol);
+	return hash.mod(pol);
 }
 
 // -----------------------------------------------------------------------------
@@ -486,11 +486,11 @@ package ubyte[] getRandom(int seed, int count)
 	import std.random : Random, uniform;
 	auto buf = new ubyte[count];
 
-	rngSource rnd;
-	Seed(&rnd, seed);
+	RNGSource rnd;
+	.seed(&rnd, seed);
 	for (auto i = 0; i < count; i += 4)
 	{
-		auto r = Int63(&rnd) >> 31;
+		auto r = int63(&rnd) >> 31;
 		buf[i] = cast(ubyte)(r);
 		buf[i+1] = cast(ubyte)(r >> 8);
 		buf[i+2] = cast(ubyte)(r >> 16);
@@ -523,11 +523,11 @@ private template parseDigest(string s)
 	enum ubyte[] parseDigest = cast(ubyte[])hexString!s;
 }
 
-private struct chunk
+private struct TestChunk
 {
-	public uint Length;
-	public ulong CutFP;
-	public ubyte[] Digest;
+	public uint length;
+	public ulong cutFP;
+	public ubyte[] digest;
 }
 
 /// polynomial used for all the tests below
@@ -539,7 +539,7 @@ private enum testPol = Pol(0x3DA3358B4DC173);
 /// chunking configuration:
 /// window size 64, avg chunksize 1<<20, min chunksize 1<<19, max chunksize 1<<23
 /// polynom 0x3DA3358B4DC173
-chunk[] chunks1 =
+TestChunk[] chunks1 =
 [
 	{2163460, 0x000b98d4cdf00000, parseDigest!"4b94cb2cf293855ea43bf766731c74969b91aa6bf3c078719aabdd19860d590d"},
 	{643703, 0x000d4e8364d00000, parseDigest!"5727a63c0964f365ab8ed2ccf604912f2ea7be29759a2b53ede4d6841e397407"},
@@ -566,17 +566,17 @@ chunk[] chunks1 =
 	{237392, 0x0000000000000001, parseDigest!"fcd567f5d866357a8e299fd5b2359bb2c8157c30395229c4e9b0a353944a7978"},
 ];
 
-/// test if nullbytes are correctly split, even if length is a multiple of MinSize.
-chunk[] chunks2 =
+/// test if nullbytes are correctly split, even if length is a multiple of minSize.
+TestChunk[] chunks2 =
 [
-	{MinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
-	{MinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
-	{MinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
-	{MinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
+	{minSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
+	{minSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
+	{minSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
+	{minSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
 ];
 
 /// the same as chunks1, but avg chunksize is 1<<19
-chunk[] chunks3 =
+TestChunk[] chunks3 =
 [
 	{1491586, 0x00023e586ea80000, parseDigest!"4c008237df602048039287427171cef568a6cb965d1b5ca28dc80504a24bb061"},
 	{671874, 0x000b98d4cdf00000, parseDigest!"fa8a42321b90c3d4ce9dd850562b2fd0c0fe4bdd26cf01a24f22046a224225d3"},
@@ -613,40 +613,40 @@ chunk[] chunks3 =
 
 version(unittest) import std.format;
 
-version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChunks, bool checkDigest)
+version(unittest) private Chunk[] testWithData(Chunker* chnker, TestChunk[] testChunks, bool checkDigest)
 {
 	Chunk[] chunks;
 
 	auto pos = uint(0);
 	foreach (i, chunk; testChunks)
 	{
-		auto c = chnker.Next(null);
+		auto c = chnker.next(null);
 
-		assert(c.Start == pos,
+		assert(c.start == pos,
 			format!"Start for chunk %d does not match: expected %d, got %d"
-			(i, pos, c.Start));
+			(i, pos, c.start));
 
-		assert(c.Length == chunk.Length,
+		assert(c.length == chunk.length,
 			format!"Length for chunk %d does not match: expected %d, got %d"
-			(i, chunk.Length, c.Length));
+			(i, chunk.length, c.length));
 
-		assert(c.Cut == chunk.CutFP,
+		assert(c.cut == chunk.cutFP,
 			format!"Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x"
-			(i, testChunks.length-1, chunk.CutFP, c.Cut));
+			(i, testChunks.length-1, chunk.cutFP, c.cut));
 
 		if (checkDigest)
 		{
-			auto digest = hashData(c.Data);
-			assert(chunk.Digest == digest,
+			auto digest = hashData(c.data);
+			assert(chunk.digest == digest,
 				format!"Digest fingerprint for chunk %d/%d does not match: expected %(%02x%), got %(%02x%)"
-				(i, testChunks.length-1, chunk.Digest, digest));
+				(i, testChunks.length-1, chunk.digest, digest));
 		}
 
-		pos += c.Length;
+		pos += c.length;
 		chunks ~= c;
 	}
 
-	auto c = chnker.Next(null);
+	auto c = chnker.next(null);
 	if (c !is Chunk.init)
 		assert(false, "Wrong error returned after last chunk");
 
@@ -662,12 +662,12 @@ version(unittest) import std.array : replicate;
 {
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = New(bufFile(buf), testPol);
+	auto ch = newChunker(bufFile(buf), testPol);
 	testWithData(ch, chunks1, true);
 
 	// setup nullbyte data source
-	buf = replicate([ubyte(0)], chunks2.length*MinSize);
-	ch = New(bufFile(buf), testPol);
+	buf = replicate([ubyte(0)], chunks2.length*minSize);
+	ch = newChunker(bufFile(buf), testPol);
 
 	testWithData(ch, chunks2, true);
 }
@@ -675,20 +675,20 @@ version(unittest) import std.array : replicate;
 @(`ChunkerWithCustomAverageBits`) unittest
 {
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = New(bufFile(buf), testPol);
+	auto ch = newChunker(bufFile(buf), testPol);
 
 	// sligthly decrease averageBits to get more chunks
-	ch.SetAverageBits(19);
+	ch.setAverageBits(19);
 	testWithData(ch, chunks3, true);
 }
 
 @(`ChunkerReset`) unittest
 {
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = New(bufFile(buf), testPol);
+	auto ch = newChunker(bufFile(buf), testPol);
 	testWithData(ch, chunks1, true);
 
-	ch.Reset(bufFile(buf), testPol);
+	ch.reset(bufFile(buf), testPol);
 	testWithData(ch, chunks1, true);
 }
 
@@ -706,19 +706,19 @@ version(unittest) import std.stdio : stderr;
 	stderr.writefln!"generating random polynomial took %s"(Clock.currTime() - start);
 
 	start = Clock.currTime();
-	auto ch = New(bufFile(buf), p);
+	auto ch = newChunker(bufFile(buf), p);
 	stderr.writefln!"creating chunker took %s"(Clock.currTime() - start);
 
 	// make sure that first chunk is different
-	auto c = ch.Next(null);
+	auto c = ch.next(null);
 
-	assert(c.Cut != chunks1[0].CutFP,
+	assert(c.cut != chunks1[0].cutFP,
 		"Cut point is the same");
 
-	assert(c.Length != chunks1[0].Length,
+	assert(c.length != chunks1[0].length,
 		"Length is the same");
 
-	assert(hashData(c.Data) != chunks1[0].Digest,
+	assert(hashData(c.data) != chunks1[0].digest,
 		"Digest is the same");
 }
 
@@ -727,24 +727,24 @@ version(unittest) import std.stdio : stderr;
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
 
-	auto ch = New(bufFile(buf), testPol);
+	auto ch = newChunker(bufFile(buf), testPol);
 	auto chunks = testWithData(ch, chunks1, false);
 
 	// test reader
 	foreach (i, c; chunks)
 	{
-		assert(c.Data.length == chunks1[i].Length,
+		assert(c.data.length == chunks1[i].length,
 			format!"reader returned wrong number of bytes: expected %d, got %d"
-			(chunks1[i].Length, c.Data.length));
+			(chunks1[i].length, c.data.length));
 
-		assert(buf[c.Start .. c.Start+c.Length] == c.Data,
+		assert(buf[c.start .. c.start+c.length] == c.data,
 			format!"invalid data for chunk returned: expected %(%02x%), got %(%02x%)"
-			(buf[c.Start .. c.Start+c.Length], c.Data));
+			(buf[c.start .. c.start+c.length], c.data));
 	}
 
 	// setup nullbyte data source
-	buf = replicate([ubyte(0)], chunks2.length*MinSize);
-	ch = New(bufFile(buf), testPol);
+	buf = replicate([ubyte(0)], chunks2.length*minSize);
+	ch = newChunker(bufFile(buf), testPol);
 
 	testWithData(ch, chunks2, false);
 }
@@ -756,8 +756,8 @@ version (benchmark) void benchmarkChunker(bool checkDigest)
 {
 	auto size = 32 * 1024 * 1024;
 	auto rd = bufFile(getRandom(23, size));
-	auto ch = New(rd, testPol);
-	auto buf = new ubyte[MaxSize];
+	auto ch = newChunker(rd, testPol);
+	auto buf = new ubyte[maxSize];
 
 	// b.ResetTimer();
 	// b.SetBytes(long(size));
@@ -769,32 +769,32 @@ version (benchmark) void benchmarkChunker(bool checkDigest)
 
 		rd.seek(0);
 
-		ch.Reset(rd, testPol);
+		ch.reset(rd, testPol);
 
 		auto cur = 0;
 		while (true)
 		{
-			auto chunk = ch.Next(buf);
+			auto chunk = ch.next(buf);
 
 			if (chunk is Chunk.init)
 			{
 				break;
 			}
 
-			assert(chunk.Length == chunks1[cur].Length,
+			assert(chunk.length == chunks1[cur].length,
 				format!"wrong chunk length, want %d, got %d"
-				(chunks1[cur].Length, chunk.Length));
+				(chunks1[cur].length, chunk.length));
 
-			assert(chunk.Cut == chunks1[cur].CutFP,
+			assert(chunk.cut == chunks1[cur].cutFP,
 				format!"wrong cut fingerprint, want 0x%x, got 0x%x"
-				(chunks1[cur].CutFP, chunk.Cut));
+				(chunks1[cur].cutFP, chunk.cut));
 
 			if (checkDigest)
 			{
-				auto h = hashData(chunk.Data);
-				assert(h == chunks1[cur].Digest,
+				auto h = hashData(chunk.data);
+				assert(h == chunks1[cur].digest,
 					format!"wrong digest, want %(%02x%), got %(%02x%)"
-					(chunks1[cur].Digest, h));
+					(chunks1[cur].digest, h));
 			}
 
 			chunks++;
@@ -823,6 +823,6 @@ version (benchmark) @(`BenchmarkNewChunker`) unittest
 
 	for (auto i = 0; i < N; i++)
 	{
-		New(bufFile(null), p);
+		newChunker(bufFile(null), p);
 	}
 }

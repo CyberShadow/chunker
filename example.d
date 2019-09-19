@@ -11,18 +11,18 @@ void main()
 	auto data = getRandom(23, 32*1024*1024);
 
 	// create a chunker
-	auto chunker = New(bufFile(data), Pol(0x3DA3358B4DC173));
+	auto chunker = newChunker(bufFile(data), Pol(0x3DA3358B4DC173));
 
 	// reuse this buffer
 	auto buf = new ubyte[8*1024*1024];
 
 	for (auto i = 0; i < 5; i++)
 	{
-		auto chunk = chunker.Next(buf);
+		auto chunk = chunker.next(buf);
 		if (chunk is Chunk.init)
 			break;
 
-		writefln!"%d %(%02x%)"(chunk.Length, sha256Of(chunk.Data));
+		writefln!"%d %(%02x%)"(chunk.length, sha256Of(chunk.data));
 	}
 
 	// Output:
@@ -32,4 +32,3 @@ void main()
 	// 1955808 c955fb059409b25f07e5ae09defbbc2aadf117c97a3724e06ad4abd2787e6824
 	// 2222372 6ba5e9f7e1b310722be3627716cf469be941f7f3e39a4c3bcefea492ec31ee56
 }
-

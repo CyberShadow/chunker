@@ -8,8 +8,8 @@ version (benchmark) enum N = 1;
 /// Pol is a polynomial from F_2[X].
 alias Pol = ulong;
 
-/// Add returns x+y.
-public Pol Add(/*this*/ Pol x, Pol y)
+/// add returns x+y.
+public Pol add(/*this*/ Pol x, Pol y)
 {
 	return Pol(ulong(x) ^ ulong(y));
 }
@@ -30,10 +30,10 @@ unittest
 
 	foreach (i, test; tests)
 	{
-		assert(test.sum == test.x.Add(test.y),
+		assert(test.sum == test.x.add(test.y),
 			format!"test %d failed: sum != x+y"(i));
 
-		assert(test.sum == test.y.Add(test.x),
+		assert(test.sum == test.y.add(test.x),
 			format!"test %d failed: sum != y+x"(i));
 	}
 }
@@ -46,34 +46,34 @@ private bool mulOverflows(Pol a, Pol b)
 {
 	if (a <= 1 || b <= 1)
 		return false;
-	auto c = a.mul(b);
-	auto d = c.Div(b);
+	auto c = a.mulImpl(b);
+	auto d = c.div(b);
 	if (d != a)
 		return true;
 
 	return false;
 }
 
-private Pol mul(/*this*/ Pol x, Pol y)
+private Pol mulImpl(/*this*/ Pol x, Pol y)
 {
 	if (x == 0 || y == 0)
 		return 0;
 
 	Pol res;
-	for (auto i = 0; i <= y.Deg(); i++)
+	for (auto i = 0; i <= y.deg(); i++)
 		if ((y & (1L << uint(i))) > 0)
-			res = res.Add(x << uint(i));
+			res = res.add(x << uint(i));
 
 	return res;
 }
 
-/// Mul returns x*y. When an overflow occurs, Mul panics.
-public Pol Mul(/*this*/ Pol x, Pol y)
+/// mul returns x*y. When an overflow occurs, mul panics.
+public Pol mul(/*this*/ Pol x, Pol y)
 {
 	if (mulOverflows(x, y))
 		throw new Exception("multiplication would overflow ulong");
 
-	return x.mul(y);
+	return x.mulImpl(y);
 }
 
 version(unittest) private Pol parseBin(string s)
@@ -131,13 +131,13 @@ unittest
 
 	foreach (i, test; tests)
 	{
-		auto m = test.x.Mul(test.y);
+		auto m = test.x.mul(test.y);
 		assert(test.res == m,
 			format!"TestPolMul failed for test %d: %s * %s: want %s, got %s"
 			(i, test.x, test.y, test.res, m));
 
-		m = test.y.Mul(test.x);
-		assert(test.res == test.y.Mul(test.x),
+		m = test.y.mul(test.x);
+		assert(test.res == test.y.mul(test.x),
 			format!"TestPolMul failed for %d: %s * %s: want %s, got %s"
 			(i, test.x, test.y, test.res, m));
 	}
@@ -148,7 +148,7 @@ unittest
 	auto x = Pol(1L << 63);
 	try
 	{
-		x.Mul(2);
+		x.mul(2);
 		assert(false, "overflow test did not panic");
 	}
 	catch (Exception e)
@@ -164,8 +164,8 @@ unittest
 }
 
 
-/// Deg returns the degree of the polynomial x. If x is zero, -1 is returned.
-public int Deg(/*this*/ Pol x)
+/// deg returns the degree of the polynomial x. If x is zero, -1 is returned.
+public int deg(/*this*/ Pol x)
 {
 	// the degree of 0 is -1
 	if (x == 0)
@@ -215,43 +215,43 @@ public int Deg(/*this*/ Pol x)
 unittest
 {
 	Pol x;
-	assert(x.Deg() == -1,
-		format!"deg(0) is not -1: %s"(x.Deg()));
+	assert(x.deg() == -1,
+		format!"deg(0) is not -1: %s"(x.deg()));
 
 	x = 1;
-	assert(x.Deg() == 0,
-		format!"deg(1) is not 0: %s"(x.Deg()));
+	assert(x.deg() == 0,
+		format!"deg(1) is not 0: %s"(x.deg()));
 
 	for (auto i = 0; i < 64; i++)
 	{
 		x = 1L << uint(i);
-		assert(x.Deg() == i,
-			format!"deg(1<<%d) is not %d: %s"(i, i, x.Deg()));
+		assert(x.deg() == i,
+			format!"deg(1<<%d) is not %d: %s"(i, i, x.deg()));
 	}
 }
 
 unittest // benchmark
 {
 	auto f = Pol(0x3af4b284899);
-	auto d = f.Deg();
+	auto d = f.deg();
 	assert(d == 41,
 		format!"BenchmalPolDeg: Wrong degree %d returned, expected %d"
 		(d, 41));
 
 	for (auto i = 0; i < N; i++)
-		f.Deg();
+		f.deg();
 }
 
 
-/// String returns the coefficients in hex.
-public string String(/*this*/ Pol x)
+/// toString returns the coefficients in hex.
+public string toString(/*this*/ Pol x)
 {
 	import std.conv : to;
 	return "0x" ~ to!string(ulong(x), 16);
 }
 
-/// Expand returns the string representation of the polynomial x.
-public string Expand(/*this*/ Pol x)
+/// expand returns the string representation of the polynomial x.
+public string expand(/*this*/ Pol x)
 {
 	import std.format : format;
 
@@ -259,7 +259,7 @@ public string Expand(/*this*/ Pol x)
 		return "0";
 
 	auto s = "";
-	for (auto i = x.Deg(); i > 1; i--)
+	for (auto i = x.deg(); i > 1; i--)
 		if ((x&(1L<<uint(i))) > 0)
 			s ~= format!"+x^%d"(i);
 
@@ -275,15 +275,15 @@ public string Expand(/*this*/ Pol x)
 unittest
 {
 	auto pol = Pol(0x3DA3358B4DC173);
-	auto s = pol.Expand();
+	auto s = pol.expand();
 	assert(s == "x^53+x^52+x^51+x^50+x^48+x^47+x^45+x^41+x^40+x^37+x^36+x^34+x^32+x^31+x^27+x^25+x^24+x^22+x^19+x^18+x^16+x^15+x^14+x^8+x^6+x^5+x^4+x+1",
 		"wrong result");
 }
 
 
-/// DivMod returns x / d = q, and remainder r,
+/// divMod returns x / d = q, and remainder r,
 /// see https://en.wikipedia.org/wiki/Division_algorithm
-public Pol[2] DivMod(/*this*/ Pol x, Pol d)
+public Pol[2] divMod(/*this*/ Pol x, Pol d)
 {
 	if (x == 0)
 		return [0, 0];
@@ -291,8 +291,8 @@ public Pol[2] DivMod(/*this*/ Pol x, Pol d)
 	if (d == 0)
 		assert(false, "division by zero");
 
-	auto D = d.Deg();
-	auto diff = x.Deg() - D;
+	auto D = d.deg();
+	auto diff = x.deg() - D;
 	if (diff < 0)
 		return [0, x];
 
@@ -301,9 +301,9 @@ public Pol[2] DivMod(/*this*/ Pol x, Pol d)
 	{
 		auto m = d << uint(diff);
 		q |= (1L << uint(diff));
-		x = x.Add(m);
+		x = x.add(m);
 
-		diff = x.Deg() - D;
+		diff = x.deg() - D;
 	}
 
 	return [q, x];
@@ -315,14 +315,14 @@ unittest // benchmark
 	auto g = Pol(0x3af4b284899);
 
 	for (auto i = 0; i < N; i++)
-		g.DivMod(f);
+		g.divMod(f);
 }
 
 
-/// Div returns the integer division result x / d.
-public Pol Div(/*this*/ Pol x, Pol d)
+/// div returns the integer division result x / d.
+public Pol div(/*this*/ Pol x, Pol d)
 {
-	auto q = x.DivMod(d)[0];
+	auto q = x.divMod(d)[0];
 	return q;
 }
 
@@ -363,7 +363,7 @@ unittest
 
 	foreach (i, test; tests)
 	{
-		auto m = test.x.Div(test.y);
+		auto m = test.x.div(test.y);
 		assert(test.res == m,
 			format!"TestPolDiv failed for test %d: %s * %s: want %s, got %s"
 			(i, test.x, test.y, test.res, m));
@@ -376,14 +376,14 @@ unittest // benchmark
 	auto g = Pol(0x3af4b284899);
 
 	for (auto i = 0; i < N; i++)
-		g.Div(f);
+		g.div(f);
 }
 
 
-/// Mod returns the remainder of x / d
-public Pol Mod(/*this*/ Pol x, Pol d)
+/// mod returns the remainder of x / d
+public Pol mod(/*this*/ Pol x, Pol d)
 {
-	auto r = x.DivMod(d)[1];
+	auto r = x.divMod(d)[1];
 	return r;
 }
 
@@ -423,7 +423,7 @@ unittest
 
 	foreach (i, test; tests)
 	{
-		auto res = test.x.Mod(test.y);
+		auto res = test.x.mod(test.y);
 		assert(test.res == res,
 			format!"test %d failed: want %s, got %s"(i, test.res, res));
 	}
@@ -435,7 +435,7 @@ unittest // benchmark
 	auto g = Pol(0x3af4b284899);
 
 	for (auto i = 0; i < N; i++)
-		g.Mod(f);
+		g.mod(f);
 }
 
 
@@ -490,7 +490,7 @@ public Pol DerivePolynomial(Random)(Random source)
 		f |= (1L << 53) | 1;
 
 		// test if f is irreducible
-		if (f.Irreducible())
+		if (f.irreducible())
 			return f;
 	}
 
@@ -508,13 +508,13 @@ public Pol GCD(/*this*/ Pol x, Pol f)
 	if (x == 0)
 		return f;
 
-	if (x.Deg() < f.Deg())
+	if (x.deg() < f.deg())
 	{
 		import std.algorithm.mutation : swap;
 		swap(x, f);
 	}
 
-	return f.GCD(x.Mod(f));
+	return f.GCD(x.mod(f));
 }
 
 unittest
@@ -587,14 +587,14 @@ unittest
 }
 
 
-/// Irreducible returns true iff x is irreducible over F_2. This function
+/// irreducible returns true iff x is irreducible over F_2. This function
 /// uses Ben Or's reducibility test.
 //
 /// For details see "Tests and Constructions of Irreducible Polynomials over
 /// Finite Fields".
-public bool Irreducible(/*this*/ Pol x)
+public bool irreducible(/*this*/ Pol x)
 {
-	for (auto i = 1; i <= x.Deg()/2; i++)
+	for (auto i = 1; i <= x.deg()/2; i++)
 		if (x.GCD(qp(uint(i), x)) != 1)
 			return false;
 
@@ -637,9 +637,9 @@ unittest
 	];
 
 	foreach (_, test; tests)
-		assert(test.f.Irreducible() == test.irred,
+		assert(test.f.irreducible() == test.irred,
 			format!"Irreducibility test for Polynomial %s failed: got %s, wanted %s"
-			(test.f, test.f.Irreducible(), test.irred));
+			(test.f, test.f.irreducible(), test.irred));
 
 	// find first irreducible polynomial
 	Pol pol;
@@ -651,25 +651,25 @@ unittest
 		}
 
 	for (auto i = 0; i < N; i++)
-		if (!pol.Irreducible())
+		if (!pol.irreducible())
 			assert(false, format!"Irreducibility test for Polynomial %s failed"(pol));
 }
 
 
-/// MulMod computes x*f mod g
-public Pol MulMod(/*this*/ Pol x, Pol f, Pol g)
+/// mulMod computes x*f mod g
+public Pol mulMod(/*this*/ Pol x, Pol f, Pol g)
 {
 	if (x == 0 || f == 0)
 		return 0;
 
 	Pol res;
-	for (auto i = 0; i <= f.Deg(); i++)
+	for (auto i = 0; i <= f.deg(); i++)
 		if ((f & (1L << uint(i))) > 0)
 		{
 			auto a = x;
 			for (auto j = 0; j < i; j++)
-				a = a.Mul(2).Mod(g);
-			res = res.Add(a).Mod(g);
+				a = a.mul(2).mod(g);
+			res = res.add(a).mod(g);
 		}
 
 	return res;
@@ -702,9 +702,9 @@ unittest
 
 	foreach (i, test; tests)
 	{
-		auto mod = test.f1.MulMod(test.f2, test.g);
+		auto mod = test.f1.mulMod(test.f2, test.g);
 		assert(mod == test.mod,
-			format!"MulMod test %d (%+s) failed: got %s, wanted %s"
+			format!"mulMod test %d (%+s) failed: got %s, wanted %s"
 			(i, test, mod, test.mod));
 	}
 }
@@ -723,11 +723,11 @@ private Pol qp(uint p, Pol g)
 	while (i < num)
 	{
 		// repeatedly square res
-		res = res.MulMod(res, g);
+		res = res.mulMod(res, g);
 		i *= 2;
 	}
 
 	// add x
-	return res.Add(2).Mod(g);
+	return res.add(2).mod(g);
 }
 
