@@ -164,15 +164,15 @@ private struct chunkerConfig
 /// Chunker splits content with Rabin Fingerprints.
 public struct Chunker
 {
-	.chunkerConfig chunkerConfig;
-	.chunkerState chunkerState;
+	.chunkerConfig config;
+	.chunkerState state;
 }
 
 /// SetAverageBits allows to control the frequency of chunk discovery:
 /// the lower averageBits, the higher amount of chunks will be identified.
 /// The default value is 20 bits, so chunks will be of 1MiB size on average.
 public void SetAverageBits(/*this*/ Chunker* c, int averageBits) {
-	c.splitmask = (1 << ulong(averageBits)) - 1;
+	c.config.splitmask = (1 << ulong(averageBits)) - 1;
 }
 
 /// New returns a new Chunker based on polynomial p that reads from rd.
@@ -183,11 +183,11 @@ public Chunker* New(File rd, Pol pol) {
 /// NewWithBoundaries returns a new Chunker based on polynomial p that reads from
 /// rd and custom min and max size boundaries.
 public Chunker* NewWithBoundaries(File rd, Pol pol, uint min, uint max) {
-	Chunker c = {
-		chunkerState: {
+	Chunker v = {
+		state: {
 			buf: new ubyte[chunkerBufSize],
 		},
-		chunkerConfig: {
+		config: {
 			pol:       pol,
 			rd:        rd,
 			MinSize:   min,
@@ -195,10 +195,11 @@ public Chunker* NewWithBoundaries(File rd, Pol pol, uint min, uint max) {
 			splitmask: (1 << 20) - 1, // aim to create chunks of 20 bits or about 1MiB on average.
 		},
 	};
+	auto c = [v].ptr;
 
 	c.reset();
 
-	return [c].ptr;
+	return c;
 }
 
 /// Reset reinitializes the chunker with a new reader and polynomial.
@@ -210,10 +211,10 @@ public void Reset(/*this*/ Chunker* c, File rd, Pol pol) {
 /// and custom min and max size boundaries.
 public void ResetWithBoundaries(/*this*/ Chunker* c, File rd, Pol pol, uint min, uint max) {
 	Chunker v = {
-		chunkerState: {
+		state: {
 			buf: new ubyte[chunkerBufSize],
 		},
-		chunkerConfig: {
+		config: {
 			pol:       pol,
 			rd:        rd,
 			MinSize:   min,
@@ -227,39 +228,39 @@ public void ResetWithBoundaries(/*this*/ Chunker* c, File rd, Pol pol, uint min,
 }
 
 private void reset(/*this*/ Chunker* c) {
-	c.polShift = uint(c.pol.Deg() - 8);
+	c.config.polShift = uint(c.config.pol.Deg() - 8);
 	c.fillTables();
 
 	for (auto i = 0; i < windowSize; i++) {
-		c.window[i] = 0;
+		c.state.window[i] = 0;
 	}
 
-	c.closed = false;
-	c.digest = 0;
-	c.wpos = 0;
-	c.count = 0;
-	c.digest = c.slide(c.digest, 1);
-	c.start = c.pos;
+	c.config.closed = false;
+	c.state.digest = 0;
+	c.state.wpos = 0;
+	c.state.count = 0;
+	c.state.digest = c.slide(c.state.digest, 1);
+	c.state.start = c.state.pos;
 
 	// do not start a new chunk unless at least MinSize bytes have been read
-	c.pre = c.MinSize - windowSize;
+	c.state.pre = c.config.MinSize - windowSize;
 }
 
 /// fillTables calculates out_table and mod_table for optimization. This
 /// implementation uses a cache in the global variable cache.
 private void fillTables(/*this*/ Chunker* c) {
 	// if polynomial hasn't been specified, do not compute anything for now
-	if (c.pol == 0) {
+	if (c.config.pol == 0) {
 		return;
 	}
 
-	c.tablesInitialized = true;
+	c.config.tablesInitialized = true;
 
 	// test if the tables are cached for this polynomial
 	synchronized(cache.mutex)
 	{
-		if (auto t = c.pol in cache.entries) {
-			c.tables = *t;
+		if (auto t = c.config.pol in cache.entries) {
+			c.config.tables = *t;
 			return;
 		}
 
@@ -277,15 +278,15 @@ private void fillTables(/*this*/ Chunker* c) {
 		for (auto b = 0; b < 256; b++) {
 			Pol h;
 
-			h = appendByte(h, ubyte(b), c.pol);
+			h = appendByte(h, cast(ubyte)b, c.config.pol);
 			for (auto i = 0; i < windowSize-1; i++) {
-				h = appendByte(h, 0, c.pol);
+				h = appendByte(h, 0, c.config.pol);
 			}
-			c.tables.out_[b] = h;
+			c.config.tables.out_[b] = h;
 		}
 
 		// calculate table for reduction mod Polynomial
-		auto k = c.pol.Deg();
+		auto k = c.config.pol.Deg();
 		for (auto b = 0; b < 256; b++) {
 			// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
 			//
@@ -294,10 +295,10 @@ private void fillTables(/*this*/ Chunker* c) {
 			// two parts: Part A contains the result of the modulus operation, part
 			// B is used to cancel out the 8 top bits so that one XOR operation is
 			// enough to reduce modulo Polynomial
-			c.tables.mod[b] = Pol(ulong(b)<<uint(k)).Mod(c.pol) | (Pol(b) << uint(k));
+			c.config.tables.mod[b] = Pol(ulong(b)<<uint(k)).Mod(c.config.pol) | (Pol(b) << uint(k));
 		}
 
-		cache.entries[c.pol] = c.tables;
+		cache.entries[c.config.pol] = c.config.tables;
 	}
 }
 
@@ -305,84 +306,72 @@ private void fillTables(/*this*/ Chunker* c) {
 /// occurs while reading, the error is returned. Afterwards, the state of the
 /// current chunk is undefined. When the last chunk has been returned, all
 /// subsequent calls yield an io.EOF error.
-public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
+public Chunk Next(/*this*/ Chunker* c, ubyte[] data) {
 	data = data[];
-	if (!c.tablesInitialized) {
+	if (!c.config.tablesInitialized) {
 		throw new Exception("tables for polynomial computation not initialized");
 	}
 
-	auto tabout = c.tables.out_;
-	auto tabmod = c.tables.mod;
-	auto polShift = c.polShift;
-	auto minSize = c.MinSize;
-	auto maxSize = c.MaxSize;
-	auto buf = c.buf;
+	auto tabout = c.config.tables.out_;
+	auto tabmod = c.config.tables.mod;
+	auto polShift = c.config.polShift;
+	auto minSize = c.config.MinSize;
+	auto maxSize = c.config.MaxSize;
+	auto buf = c.state.buf;
 	while (true) {
-		if (c.bpos >= c.bmax) {
-			size_t n; Exception err;
-			try
-				n = io.ReadFull(c.rd, buf[]);
-			catch (Exception e)
-				err = e; // TODO
+		if (c.state.bpos >= c.state.bmax) {
+			auto n = c.config.rd.rawRead(buf[]).length;
 
-			if (err == io.ErrUnexpectedEOF) {
-				err = null;
-			}
-
-			// io.ReadFull only returns io.EOF when no bytes could be read. If
-			// this is the case and we're in this branch, there are no more
-			// bytes to buffer, so this was the last chunk. If a different
-			// error has occurred, return that error and abandon the current
+			// There are no more bytes to buffer, so this was the last
 			// chunk.
-			if (err == io.EOF && !c.closed) {
-				c.closed = true;
+			if (n == 0 && !c.config.closed) {
+				c.config.closed = true;
 
 				// return current chunk, if any bytes have been processed
-				if (c.count > 0) {
+				if (c.state.count > 0) {
 					return Chunk(
-						/*Start: */ c.start,
-						/*Length:*/ c.count,
-						/*Cut:   */ c.digest,
+						/*Start: */ c.state.start,
+						/*Length:*/ c.state.count,
+						/*Cut:   */ c.state.digest,
 						/*Data:  */ data,
 					);
 				}
 			}
 
-			if (err != null) {
-				return Chunk(), err;
-			}
+			if (n == 0)
+				return Chunk.init;
 
-			c.bpos = 0;
-			c.bmax = uint(n);
+			c.state.bpos = 0;
+			c.state.bmax = cast(uint)n;
 		}
 
 		// check if bytes have to be dismissed before starting a new chunk
-		if (c.pre > 0) {
-			auto n = c.bmax - c.bpos;
-			if (c.pre > uint(n)) {
-				c.pre -= uint(n);
-				data ~= buf[c.bpos .. c.bmax];
+		if (c.state.pre > 0) {
+			auto n = c.state.bmax - c.state.bpos;
+			if (c.state.pre > uint(n)) {
+				c.state.pre -= uint(n);
+				data ~= buf[c.state.bpos .. c.state.bmax];
 
-				c.count += uint(n);
-				c.pos += uint(n);
-				c.bpos = c.bmax;
+				c.state.count += uint(n);
+				c.state.pos += uint(n);
+				c.state.bpos = c.state.bmax;
 
 				continue;
 			}
 
-			data ~= buf[c.bpos .. c.bpos+c.pre];
+			data ~= buf[c.state.bpos .. c.state.bpos+c.state.pre];
 
-			c.bpos += c.pre;
-			c.count += c.pre;
-			c.pos += c.pre;
-			c.pre = 0;
+			c.state.bpos += c.state.pre;
+			c.state.count += c.state.pre;
+			c.state.pos += c.state.pre;
+			c.state.pre = 0;
 		}
 
-		auto add = c.count;
-		auto digest = c.digest;
-		auto win = c.window;
-		auto wpos = c.wpos;
-		foreach (_, b; buf[c.bpos .. c.bmax]) {
+		auto add = c.state.count;
+		auto digest = c.state.digest;
+		auto win = c.state.window;
+		auto wpos = c.state.wpos;
+		foreach (_, b; buf[c.state.bpos .. c.state.bmax]) {
 			// slide(b)
 			auto out_ = win[wpos];
 			win[wpos] = b;
@@ -393,7 +382,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 			}
 
 			// updateDigest
-			auto index = ubyte(digest >> polShift);
+			auto index = cast(ubyte)(digest >> polShift);
 			digest <<= 8;
 			digest |= ulong(b);
 
@@ -405,37 +394,37 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 				continue;
 			}
 
-			if ((digest&c.splitmask) == 0 || add >= maxSize) {
-				auto i = add - c.count - 1;
-				data ~= c.buf[c.bpos .. c.bpos+uint(i)+1];
-				c.count = add;
-				c.pos += uint(i) + 1;
-				c.bpos += uint(i) + 1;
-				c.buf = buf;
+			if ((digest&c.config.splitmask) == 0 || add >= maxSize) {
+				auto i = add - c.state.count - 1;
+				data ~= c.state.buf[c.state.bpos .. c.state.bpos+uint(i)+1];
+				c.state.count = add;
+				c.state.pos += uint(i) + 1;
+				c.state.bpos += uint(i) + 1;
+				c.state.buf = buf;
 
 				auto chunk = Chunk(
-					/*Start: */ c.start,
-					/*Length:*/ c.count,
+					/*Start: */ c.state.start,
+					/*Length:*/ c.state.count,
 					/*Cut:   */ digest,
 					/*Data:  */ data,
 				);
 
 				c.reset();
 
-				return chunk, null;
+				return chunk;
 			}
 		}
-		c.digest = digest;
-		c.window = win;
-		c.wpos = wpos;
+		c.state.digest = digest;
+		c.state.window = win;
+		c.state.wpos = wpos;
 
-		auto steps = c.bmax - c.bpos;
+		auto steps = c.state.bmax - c.state.bpos;
 		if (steps > 0) {
-			data ~= c.buf[c.bpos .. c.bpos+steps];
+			data ~= c.state.buf[c.state.bpos .. c.state.bpos+steps];
 		}
-		c.count += steps;
-		c.pos += steps;
-		c.bpos = c.bmax;
+		c.state.count += steps;
+		c.state.pos += steps;
+		c.state.bpos = c.state.bmax;
 	}
 }
 
@@ -449,12 +438,12 @@ private ulong /*newDigest*/ updateDigest(ulong digest, uint polShift, tables tab
 }
 
 private ulong /*newDigest*/ slide(/*this*/ Chunker* c, ulong digest, ubyte b) {
-	auto out_ = c.window[c.wpos];
-	c.window[c.wpos] = b;
-	digest ^= ulong(c.tables.out_[out_]);
-	c.wpos = (c.wpos + 1) % windowSize;
+	auto out_ = c.state.window[c.state.wpos];
+	c.state.window[c.state.wpos] = b;
+	digest ^= ulong(c.config.tables.out_[out_]);
+	c.state.wpos = (c.state.wpos + 1) % windowSize;
 
-	digest = updateDigest(digest, c.polShift, c.tables, b);
+	digest = updateDigest(digest, c.config.polShift, c.config.tables, b);
 	return digest;
 }
 
@@ -559,7 +548,9 @@ chunk[] chunks3 = [
 	{237392, 0x0000000000000001, parseDigest!"fcd567f5d866357a8e299fd5b2359bb2c8157c30395229c4e9b0a353944a7978"},
 ];
 
-private Chunk[] testWithData(Chunker* chnker, chunk[] testChunks, bool checkDigest) {
+version(unittest) import std.format;
+
+version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChunks, bool checkDigest) {
 	Chunk[] chunks;
 
 	auto pos = uint(0);
@@ -567,25 +558,25 @@ private Chunk[] testWithData(Chunker* chnker, chunk[] testChunks, bool checkDige
 		auto c = chnker.Next(null);
 
 		if (c.Start != pos) {
-			t.Fatalf("Start for chunk %d does not match: expected %d, got %d",
-				i, pos, c.Start);
+			assert(false, format!"Start for chunk %d does not match: expected %d, got %d"
+				(i, pos, c.Start));
 		}
 
 		if (c.Length != chunk.Length) {
-			t.Fatalf("Length for chunk %d does not match: expected %d, got %d",
-				i, chunk.Length, c.Length);
+			assert(false, format!"Length for chunk %d does not match: expected %d, got %d"
+				(i, chunk.Length, c.Length));
 		}
 
 		if (c.Cut != chunk.CutFP) {
-			t.Fatalf("Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x",
-				i, len(chunks)-1, chunk.CutFP, c.Cut);
+			assert(false, format!"Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x"
+				(i, chunks.length-1, chunk.CutFP, c.Cut));
 		}
 
 		if (checkDigest) {
 			auto digest = hashData(c.Data);
-			if (!bytes.Equal(chunk.Digest, digest)) {
-				t.Fatalf("Digest fingerprint for chunk %d/%d does not match: expected %02x, got %02x",
-					i, len(chunks)-1, chunk.Digest, digest);
+			if (!(chunk.Digest == digest)) {
+				assert(false, format!"Digest fingerprint for chunk %d/%d does not match: expected %(%02x%), got %(%02x%)"
+					(i, chunks.length-1, chunk.Digest, digest));
 			}
 		}
 
@@ -593,100 +584,108 @@ private Chunk[] testWithData(Chunker* chnker, chunk[] testChunks, bool checkDige
 		chunks ~= c;
 	}
 
-	Exception err;
-	try
-		chnker.Next(null);
-	catch (Exception e)
-		err = e;
-	if (err != io.EOF) {
-		t.Fatal("Wrong error returned after last chunk");
+	auto c = chnker.Next(null);
+	if (c !is Chunk.init) {
+		assert(false, "Wrong error returned after last chunk");
 	}
 
-	if (len(chunks) != len(testChunks)) {
-		t.Fatal("Amounts of test and resulting chunks do not match");
+	if (chunks.length != testChunks.length) {
+		assert(false, "Amounts of test and resulting chunks do not match");
 	}
 
 	return chunks;
 }
 
-private ubyte[] getRandom(long seed, int count) {
+version(unittest) private ubyte[] getRandom(int seed, int count) {
+	import std.random : Random, uniform;
 	auto buf = new ubyte[count];
 
-	auto rnd = rand.New(rand.NewSource(seed));
+	auto rnd = Random(seed);
 	for (auto i = 0; i < count; i += 4) {
-		auto r = rnd.Uint32();
-		buf[i] = ubyte(r);
-		buf[i+1] = ubyte(r >> 8);
-		buf[i+2] = ubyte(r >> 16);
-		buf[i+3] = ubyte(r >> 24);
+		auto r = uniform!uint(rnd);
+		buf[i] = cast(ubyte)(r);
+		buf[i+1] = cast(ubyte)(r >> 8);
+		buf[i+2] = cast(ubyte)(r >> 16);
+		buf[i+3] = cast(ubyte)(r >> 24);
 	}
 
 	return buf;
 }
 
-private ubyte[] hashData(ubyte[] d) {
-	auto h = sha256.New();
-	h.Write(d);
-	return h.Sum(null);
+version(unittest) private ubyte[32] hashData(ubyte[] d) {
+	import std.digest.sha;
+	return sha256Of(d);
+}
+
+version(unittest) import std.array : replicate;
+
+// Temporary D shim
+version(unittest) private File bufFile(ubyte[] buf)
+{
+	File("temp.bin", "wb").rawWrite(buf);
+	return File("temp.bin", "rb");
 }
 
 @(`Chunker`) unittest {
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = New(bytes.NewReader(buf), testPol);
-	testWithData(t, ch, chunks1, true);
+	auto ch = New(bufFile(buf), testPol);
+	testWithData(ch, chunks1, true);
 
 	// setup nullbyte data source
-	buf = bytes.Repeat([ubyte(0)], len(chunks2)*MinSize);
-	ch = New(bytes.NewReader(buf), testPol);
+	buf = replicate([ubyte(0)], chunks2.length*MinSize);
+	ch = New(bufFile(buf), testPol);
 
-	testWithData(t, ch, chunks2, true);
+	testWithData(ch, chunks2, true);
 }
 
 @(`ChunkerWithCustomAverageBits`) unittest {
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = New(bytes.NewReader(buf), testPol);
+	auto ch = New(bufFile(buf), testPol);
 
 	// sligthly decrease averageBits to get more chunks
 	ch.SetAverageBits(19);
-	testWithData(t, ch, chunks3, true);
+	testWithData(ch, chunks3, true);
 }
 
 @(`ChunkerReset`) unittest {
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = New(bytes.NewReader(buf), testPol);
-	testWithData(t, ch, chunks1, true);
+	auto ch = New(bufFile(buf), testPol);
+	testWithData(ch, chunks1, true);
 
-	ch.Reset(bytes.NewReader(buf), testPol);
-	testWithData(t, ch, chunks1, true);
+	ch.Reset(bufFile(buf), testPol);
+	testWithData(ch, chunks1, true);
 }
+
+version(unittest) import std.stdio : stderr;
 
 @(`ChunkerWithRandomPolynomial`) unittest {
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
 
 	// generate a new random polynomial
-	auto start = time.Now();
+	import std.datetime.systime : Clock, SysTime;
+	auto start = Clock.currTime();
 	auto p = RandomPolynomial();
-	t.Logf("generating random polynomial took %v", time.Since(start));
+	stderr.writefln!"generating random polynomial took %s"(Clock.currTime() - start);
 
-	start = time.Now();
-	auto ch = New(bytes.NewReader(buf), p);
-	t.Logf("creating chunker took %v", time.Since(start));
+	start = Clock.currTime();
+	auto ch = New(bufFile(buf), p);
+	stderr.writefln!"creating chunker took %s"(Clock.currTime() - start);
 
 	// make sure that first chunk is different
 	auto c = ch.Next(null);
 
 	if (c.Cut == chunks1[0].CutFP) {
-		t.Fatal("Cut point is the same");
+		assert(false, "Cut point is the same");
 	}
 
 	if (c.Length == chunks1[0].Length) {
-		t.Fatal("Length is the same");
+		assert(false, "Length is the same");
 	}
 
-	if (bytes.Equal(hashData(c.Data), chunks1[0].Digest)) {
-		t.Fatal("Digest is the same");
+	if (hashData(c.Data) == chunks1[0].Digest) {
+		assert(false, "Digest is the same");
 	}
 }
 
@@ -694,84 +693,72 @@ private ubyte[] hashData(ubyte[] d) {
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
 
-	auto ch = New(bytes.NewReader(buf), testPol);
-	auto chunks = testWithData(t, ch, chunks1, false);
+	auto ch = New(bufFile(buf), testPol);
+	auto chunks = testWithData(ch, chunks1, false);
 
 	// test reader
 	foreach (i, c; chunks) {
-		if (uint(len(c.Data)) != chunks1[i].Length) {
-			t.Fatalf("reader returned wrong number of bytes: expected %d, got %d",
-				chunks1[i].Length, len(c.Data));
+		if (c.Data.length != chunks1[i].Length) {
+			assert(false, format!"reader returned wrong number of bytes: expected %d, got %d"
+				(chunks1[i].Length, c.Data.length));
 		}
 
-		if (!bytes.Equal(buf[c.Start .. c.Start+c.Length], c.Data)) {
-			t.Fatalf("invalid data for chunk returned: expected %02x, got %02x",
-				buf[c.Start .. c.Start+c.Length], c.Data);
+		if (!(buf[c.Start .. c.Start+c.Length] == c.Data)) {
+			assert(false, format!"invalid data for chunk returned: expected %(%02x%), got %(%02x%)"
+				(buf[c.Start .. c.Start+c.Length], c.Data));
 		}
 	}
 
 	// setup nullbyte data source
-	buf = bytes.Repeat([ubyte(0)], len(chunks2)*MinSize);
-	ch = New(bytes.NewReader(buf), testPol);
+	buf = replicate([ubyte(0)], chunks2.length*MinSize);
+	ch = New(bufFile(buf), testPol);
 
-	testWithData(t, ch, chunks2, false);
+	testWithData(ch, chunks2, false);
 }
 
-void benchmarkChunker(bool checkDigest) {
+version = benchmark;
+version (benchmark) enum N = 1000;
+
+version (benchmark) void benchmarkChunker(bool checkDigest) {
 	auto size = 32 * 1024 * 1024;
-	auto rd = bytes.NewReader(getRandom(23, size));
+	auto rd = bufFile(getRandom(23, size));
 	auto ch = New(rd, testPol);
 	auto buf = new ubyte[MaxSize];
 
-	b.ResetTimer();
-	b.SetBytes(long(size));
+	// b.ResetTimer();
+	// b.SetBytes(long(size));
 
 	int chunks;
-	for (auto i = 0; i < b.N; i++) {
+	for (auto i = 0; i < N; i++) {
 		chunks = 0;
 
-		Exception err;
-		try
-			rd.Seek(0, 0);
-		catch (Exception e)
-			err = e;
-		if (err != null) {
-			b.Fatalf("Seek() return error %v", err);
-		}
+		rd.seek(0);
 
 		ch.Reset(rd, testPol);
 
 		auto cur = 0;
 		while (true) {
-			Chunk chunk; Exception err;
-			try
-				chunk = ch.Next(buf);
-			catch (Exception e)
-				err = e;
+			auto chunk = ch.Next(buf);
 
-			if (err == io.EOF) {
+			if (chunk is Chunk.init) {
 				break;
 			}
 
-			if (err != null) {
-				b.Fatalf("Unexpected error occurred: %v", err);
-			}
-
 			if (chunk.Length != chunks1[cur].Length) {
-				b.Errorf("wrong chunk length, want %d, got %d",
-					chunks1[cur].Length, chunk.Length);
+				assert(false, format!"wrong chunk length, want %d, got %d"(
+					chunks1[cur].Length, chunk.Length));
 			}
 
 			if (chunk.Cut != chunks1[cur].CutFP) {
-				b.Errorf("wrong cut fingerprint, want 0x%x, got 0x%x",
-					chunks1[cur].CutFP, chunk.Cut);
+				assert(false, format!"wrong cut fingerprint, want 0x%x, got 0x%x"(
+					chunks1[cur].CutFP, chunk.Cut));
 			}
 
 			if (checkDigest) {
 				auto h = hashData(chunk.Data);
-				if (!bytes.Equal(h, chunks1[cur].Digest)) {
-					b.Errorf("wrong digest, want %x, got %x",
-						chunks1[cur].Digest, h);
+				if (!(h == chunks1[cur].Digest)) {
+					assert(false, format!"wrong digest, want %(%02x%), got %(%02x%)"(
+						chunks1[cur].Digest, h));
 				}
 			}
 
@@ -780,24 +767,24 @@ void benchmarkChunker(bool checkDigest) {
 		}
 	}
 
-	b.Logf("%d chunks, average chunk size: %d bytes", chunks, size/chunks);
+	stderr.writefln!"%d chunks, average chunk size: %d bytes"(chunks, size/chunks);
 }
 
-@(`BenchmarkChunkerWithSHA256`) unittest {
-	benchmarkChunker(b, true);
+version (benchmark) @(`BenchmarkChunkerWithSHA256`) unittest {
+	benchmarkChunker(true);
 }
 
-@(`BenchmarkChunker`) unittest {
-	benchmarkChunker(b, false);
+version (benchmark) @(`BenchmarkChunker`) unittest {
+	benchmarkChunker(false);
 }
 
-@(`BenchmarkNewChunker`) unittest {
+version (benchmark) @(`BenchmarkNewChunker`) unittest {
 	auto p = RandomPolynomial();
 
-	b.ResetTimer();
+	// b.ResetTimer();
 
-	for (auto i = 0; i < b.N; i++) {
-		New(bytes.NewBuffer(null), p);
+	for (auto i = 0; i < N; i++) {
+		New(bufFile(null), p);
 	}
 }
 
@@ -805,30 +792,24 @@ void benchmarkChunker(bool checkDigest) {
 module chunker.example_test;
 
 void ExampleChunker() {
+	import std.stdio, std.digest.sha;
+
 	// generate 32MiB of deterministic pseudo-random data
 	auto data = getRandom(23, 32*1024*1024);
 
 	// create a chunker
-	auto chunker = New(bytes.NewReader(data), Pol(0x3DA3358B4DC173));
+	auto chunker = New(bufFile(data), Pol(0x3DA3358B4DC173));
 
 	// reuse this buffer
 	auto buf = new ubyte[8*1024*1024];
 
 	for (auto i = 0; i < 5; i++) {
-		Chunk chunk; Exception err;
-		try
-			chunk = chunker.Next(buf);
-		catch (Exception e)
-			err = e;
-		if (err == io.EOF) {
+		auto chunk = chunker.Next(buf);
+		if (chunk is Chunk.init) {
 			break;
 		}
 
-		if (err != null) {
-			panic(err);
-		}
-
-		fmt.Printf("%d %02x\n", chunk.Length, sha256.Sum256(chunk.Data));
+		writefln!"%d %(%02x%)\n"(chunk.Length, sha256Of(chunk.Data));
 	}
 
 	// Output:
@@ -885,7 +866,7 @@ private Pol mul(/*this*/ Pol x, Pol y) {
 /// Mul returns x*y. When an overflow occurs, Mul panics.
 public Pol Mul(/*this*/ Pol x, Pol y) {
 	if (mulOverflows(x, y)) {
-		panic("multiplication would overflow ulong");
+		throw new Exception("multiplication would overflow ulong");
 	}
 
 	return x.mul(y);
@@ -935,7 +916,8 @@ public int Deg(/*this*/ Pol x) {
 
 /// String returns the coefficients in hex.
 public string String(/*this*/ Pol x) {
-	return "0x" + strconv.FormatUint(ulong(x), 16);
+	import std.conv : to;
+	return "0x" ~ to!string(ulong(x), 16);
 }
 
 /// Expand returns the string representation of the polynomial x.
@@ -947,16 +929,16 @@ public string Expand(/*this*/ Pol x) {
 	auto s = "";
 	for (auto i = x.Deg(); i > 1; i--) {
 		if ((x&(1<<uint(i))) > 0) {
-			s += fmt.Sprintf("+x^%d", i);
+			s ~= format!"+x^%d"(i);
 		}
 	}
 
 	if ((x&2) > 0) {
-		s += "+x";
+		s ~= "+x";
 	}
 
 	if ((x&1) > 0) {
-		s += "+1";
+		s ~= "+1";
 	}
 
 	return s[1 .. $];
@@ -964,19 +946,19 @@ public string Expand(/*this*/ Pol x) {
 
 /// DivMod returns x / d = q, and remainder r,
 /// see https://en.wikipedia.org/wiki/Division_algorithm
-public void DivMod(/*this*/ Pol x, Pol d) (Pol, Pol) {
+public Pol[2] DivMod(/*this*/ Pol x, Pol d) {
 	if (x == 0) {
-		return 0, 0;
+		return [0, 0];
 	}
 
 	if (d == 0) {
-		panic("division by zero");
+		assert(false, "division by zero");
 	}
 
 	auto D = d.Deg();
 	auto diff = x.Deg() - D;
 	if (diff < 0) {
-		return 0, x;
+		return [0, x];
 	}
 
 	Pol q;
@@ -988,7 +970,7 @@ public void DivMod(/*this*/ Pol x, Pol d) (Pol, Pol) {
 		diff = x.Deg() - D;
 	}
 
-	return q, x;
+	return [q, x];
 }
 
 /// Div returns the integer division result x / d.
@@ -1013,7 +995,8 @@ private enum randPolMaxTries = 1e6;
 /// of degree 53 using the default System CSPRNG as source.
 /// It is equivalent to calling DerivePolynomial(rand.Reader).
 public Pol RandomPolynomial() {
-	return DerivePolynomial(rand.Reader);
+	import std.random : rndGen;
+	return DerivePolynomial(rndGen);
 }
 
 /// DerivePolynomial returns an irreducible polynomial of degree 53
@@ -1022,26 +1005,24 @@ public Pol RandomPolynomial() {
 /// F_2[X], c.f. Michael O. Rabin (1981): "Fingerprinting by Random
 /// Polynomials", page 4. If no polynomial could be found in one
 /// million tries, an error is returned.
-public Pol DerivePolynomial(File source) {
+public Pol DerivePolynomial(Random)(Random source) {
 	for (auto i = 0; i < randPolMaxTries; i++) {
 		Pol f;
 
 		// choose polynomial at (pseudo)random
-		auto err = binary.Read(source, binary.LittleEndian, &f);
-		if (err != null) {
-			return 0, err;
-		}
+		import std.random : uniform;
+		f = uniform!Pol(source);
 
 		// mask away bits above bit 53
-		f &= Pol((1 << 54) - 1);
+		f &= Pol((1L << 54) - 1);
 
 		// set highest and lowest bit so that the degree is 53 and the
 		// polynomial is not trivially reducible
-		f |= (1 << 53) | 1;
+		f |= (1L << 53) | 1;
 
 		// test if f is irreducible
 		if (f.Irreducible()) {
-			return f, null;
+			return f;
 		}
 	}
 
@@ -1061,7 +1042,8 @@ public Pol GCD(/*this*/ Pol x, Pol f) {
 	}
 
 	if (x.Deg() < f.Deg()) {
-		x, f = f, x;
+		import std.algorithm.mutation : swap;
+		swap(x, f);
 	}
 
 	return f.GCD(x.Mod(f));
@@ -1121,24 +1103,6 @@ private Pol qp(uint p, Pol g) {
 	return res.Add(2).Mod(g);
 }
 
-/// MarshalJSON returns the JSON representation of the Pol.
-public ubyte[] MarshalJSON(/*this*/ Pol x) {
-	auto buf = strconv.AppendUint([ubyte('"')], ulong(x), 16);
-	buf ~= '"';
-	return buf, null;
-}
-
-/// UnmarshalJSON parses a Pol from the JSON data.
-public void UnmarshalJSON(/*this*/ Pol* x, ubyte[] data) {
-	if (len(data) < 2) {
-		throw new Exception("invalid string for polynomial");
-	}
-	auto n = strconv.ParseUint(string(data[1 .. len(data)-1]), 16, 64);
-	*x = Pol(n);
-
-	return null;
-}
-
 // ----------------------------------------------------------- polynomials_test.d
 module chunker.polynomials_test;
 
@@ -1155,11 +1119,11 @@ polAddTest[] polAddTests = [
 @(`PolAdd`) unittest {
 	foreach (i, test; polAddTests) {
 		if (test.sum != test.x.Add(test.y)) {
-			t.Errorf("test %d failed: sum != x+y", i);
+			assert(false, format!"test %d failed: sum != x+y"( i));
 		}
 
 		if (test.sum != test.y.Add(test.x)) {
-			t.Errorf("test %d failed: sum != y+x", i);
+			assert(false, format!"test %d failed: sum != y+x"( i));
 		}
 	}
 }
@@ -1218,23 +1182,23 @@ polMulTest[] polMulTests = [
 	foreach (i, test; polMulTests) {
 		auto m = test.x.Mul(test.y);
 		if (test.res != m) {
-			t.Errorf("TestPolMul failed for test %d: %v * %v: want %v, got %v",
-				i, test.x, test.y, test.res, m);
+			assert(false, format!"TestPolMul failed for test %d: %s * %s: want %s, got %s"(
+				i, test.x, test.y, test.res, m));
 		}
 		m = test.y.Mul(test.x);
 		if (test.res != test.y.Mul(test.x)) {
-			t.Errorf("TestPolMul failed for %d: %v * %v: want %v, got %v",
-				i, test.x, test.y, test.res, m);
+			assert(false, format!"TestPolMul failed for %d: %s * %s: want %s, got %s"(
+				i, test.x, test.y, test.res, m));
 		}
 	}
 }
 
 @(`PolMulOverflow`) unittest {
-	auto x = Pol(1 << 63);
+	auto x = Pol(1L << 63);
 	try
 	{
 		x.Mul(2);
-		t.Fatal("overflow test did not panic");
+		assert(false, "overflow test did not panic");
 	}
 	catch (Exception e)
 	{
@@ -1242,9 +1206,9 @@ polMulTest[] polMulTests = [
 		if (e.msg == "multiplication would overflow ulong")
 			return;
 
-		t.Logf("invalid error raised: %v", err);
+		stderr.writefln!"invalid error raised: %s"(e);
 		// re-raise error if not overflow
-		panic(err);
+		throw e;
 	}
 }
 
@@ -1282,8 +1246,8 @@ polDivTest[] polDivTests = [
 	foreach (i, test; polDivTests) {
 		auto m = test.x.Div(test.y);
 		if (test.res != m) {
-			t.Errorf("TestPolDiv failed for test %d: %v * %v: want %v, got %v",
-				i, test.x, test.y, test.res, m);
+			assert(false, format!"TestPolDiv failed for test %d: %s * %s: want %s, got %s"(
+				i, test.x, test.y, test.res, m));
 		}
 	}
 }
@@ -1291,18 +1255,18 @@ polDivTest[] polDivTests = [
 @(`PolDeg`) unittest {
 	Pol x;
 	if (x.Deg() != -1) {
-		t.Errorf("deg(0) is not -1: %v", x.Deg());
+		assert(false, format!"deg(0) is not -1: %s"( x.Deg()));
 	}
 
 	x = 1;
 	if (x.Deg() != 0) {
-		t.Errorf("deg(1) is not 0: %v", x.Deg());
+		assert(false, format!"deg(1) is not 0: %s"( x.Deg()));
 	}
 
 	for (auto i = 0; i < 64; i++) {
 		x = 1 << uint(i);
 		if (x.Deg() != i) {
-			t.Errorf("deg(1<<%d) is not %d: %v", i, i, x.Deg());
+			assert(false, format!"deg(1<<%d) is not %d: %s"( i, i, x.Deg()));
 		}
 	}
 }
@@ -1341,47 +1305,47 @@ polModTest[] polModTests = [
 	foreach (i, test; polModTests) {
 		auto res = test.x.Mod(test.y);
 		if (test.res != res) {
-			t.Errorf("test %d failed: want %v, got %v", i, test.res, res);
+			assert(false, format!"test %d failed: want %s, got %s"( i, test.res, res));
 		}
 	}
 }
 
-@(`BenchmarkPolDivMod`) unittest {
+version(benchmark) @(`BenchmarkPolDivMod`) unittest {
 	auto f = Pol(0x2482734cacca49);
 	auto g = Pol(0x3af4b284899);
 
-	for (auto i = 0; i < t.N; i++) {
+	for (auto i = 0; i < N; i++) {
 		g.DivMod(f);
 	}
 }
 
-@(`BenchmarkPolDiv`) unittest {
+version(benchmark) @(`BenchmarkPolDiv`) unittest {
 	auto f = Pol(0x2482734cacca49);
 	auto g = Pol(0x3af4b284899);
 
-	for (auto i = 0; i < t.N; i++) {
+	for (auto i = 0; i < N; i++) {
 		g.Div(f);
 	}
 }
 
-@(`BenchmarkPolMod`) unittest {
+version(benchmark) @(`BenchmarkPolMod`) unittest {
 	auto f = Pol(0x2482734cacca49);
 	auto g = Pol(0x3af4b284899);
 
-	for (auto i = 0; i < t.N; i++) {
+	for (auto i = 0; i < N; i++) {
 		g.Mod(f);
 	}
 }
 
-@(`BenchmarkPolDeg`) unittest {
+version(benchmark) @(`BenchmarkPolDeg`) unittest {
 	auto f = Pol(0x3af4b284899);
 	auto d = f.Deg();
 	if (d != 41) {
-		t.Fatalf("BenchmalPolDeg: Wrong degree %d returned, expected %d",
-			d, 41);
+		assert(false, format!"BenchmalPolDeg: Wrong degree %d returned, expected %d"
+			(d, 41));
 	}
 
-	for (auto i = 0; i < t.N; i++) {
+	for (auto i = 0; i < N; i++) {
 		f.Deg();
 	}
 }
@@ -1390,8 +1354,8 @@ polModTest[] polModTests = [
 	RandomPolynomial();
 }
 
-@(`BenchmarkRandomPolynomial`) unittest {
-	for (auto i = 0; i < t.N; i++) {
+version(benchmark) @(`BenchmarkRandomPolynomial`) unittest {
+	for (auto i = 0; i < N; i++) {
 		RandomPolynomial();
 	}
 }
@@ -1400,7 +1364,7 @@ polModTest[] polModTests = [
 	auto pol = Pol(0x3DA3358B4DC173);
 	auto s = pol.Expand();
 	if (s != "x^53+x^52+x^51+x^50+x^48+x^47+x^45+x^41+x^40+x^37+x^36+x^34+x^32+x^31+x^27+x^25+x^24+x^22+x^19+x^18+x^16+x^15+x^14+x^8+x^6+x^5+x^4+x+1") {
-		t.Fatal("wrong result");
+		assert(false, "wrong result");
 	}
 }
 
@@ -1438,13 +1402,13 @@ polIrredTest[] polIrredTests = [
 @(`PolIrreducible`) unittest {
 	foreach (_, test; polIrredTests) {
 		if (test.f.Irreducible() != test.irred) {
-			t.Errorf("Irreducibility test for Polynomial %v failed: got %v, wanted %v",
-				test.f, test.f.Irreducible(), test.irred);
+			assert(false, format!"Irreducibility test for Polynomial %s failed: got %s, wanted %s"(
+				test.f, test.f.Irreducible(), test.irred));
 		}
 	}
 }
 
-@(`BenchmarkPolIrreducible`) unittest {
+version(benchmark) @(`BenchmarkPolIrreducible`) unittest {
 	// find first irreducible polynomial
 	Pol pol;
 	foreach (_, test; polIrredTests) {
@@ -1454,9 +1418,9 @@ polIrredTest[] polIrredTests = [
 		}
 	}
 
-	for (auto i = 0; i < b.N; i++) {
+	for (auto i = 0; i < N; i++) {
 		if (!pol.Irreducible()) {
-			b.Errorf("Irreducibility test for Polynomial %v failed", pol);
+			assert(false, format!"Irreducibility test for Polynomial %s failed"( pol));
 		}
 	}
 }
@@ -1516,14 +1480,14 @@ polGCDTest[] polGCDTests = [
 	foreach (i, test; polGCDTests) {
 		auto gcd = test.f1.GCD(test.f2);
 		if (test.gcd != gcd) {
-			t.Errorf("GCD test %d (%+v) failed: got %v, wanted %v",
-				i, test, gcd, test.gcd);
+			assert(false, format!"GCD test %d (%+s) failed: got %s, wanted %s"(
+				i, test, gcd, test.gcd));
 		}
 
 		gcd = test.f2.GCD(test.f1);
 		if (test.gcd != gcd) {
-			t.Errorf("GCD test %d (%+v) failed: got %v, wanted %v",
-				i, test, gcd, test.gcd);
+			assert(false, format!"GCD test %d (%+s) failed: got %s, wanted %s"(
+				i, test, gcd, test.gcd));
 		}
 	}
 }
@@ -1553,8 +1517,8 @@ polMulModTest[] polMulModTests = [
 	foreach (i, test; polMulModTests) {
 		auto mod = test.f1.MulMod(test.f2, test.g);
 		if (mod != test.mod) {
-			t.Errorf("MulMod test %d (%+v) failed: got %v, wanted %v",
-				i, test, mod, test.mod);
+			assert(false, format!"MulMod test %d (%+s) failed: got %s, wanted %s"(
+				i, test, mod, test.mod));
 		}
 	}
 }
