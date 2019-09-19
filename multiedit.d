@@ -254,48 +254,49 @@ private void fillTables(/*this*/ Chunker* c) {
 	c.tablesInitialized = true;
 
 	// test if the tables are cached for this polynomial
-	cache.Lock();
-	defer cache.Unlock();
-	if (t, ok := cache.entries[c.pol]; ok) {
-		c.tables = t;
-		return;
-	}
-
-	// calculate table for sliding out bytes. The byte to slide out is used as
-	// the index for the table, the value contains the following:
-	// out_table[b] = Hash(b || 0 ||        ...        || 0)
-	//                          \ windowsize-1 zero bytes /
-	// To slide out byte b_0 for window size w with known hash
-	// H := H(b_0 || ... || b_w), it is sufficient to add out_table[b_0]:
-	//    H(b_0 || ... || b_w) + H(b_0 || 0 || ... || 0)
-	//  = H(b_0 + b_0 || b_1 + 0 || ... || b_w + 0)
-	//  = H(    0     || b_1 || ...     || b_w)
-	//
-	// Afterwards a new byte can be shifted in.
-	for (auto b = 0; b < 256; b++) {
-		var h Pol;
-
-		h = appendByte(h, ubyte(b), c.pol);
-		for (auto i = 0; i < windowSize-1; i++) {
-			h = appendByte(h, 0, c.pol);
+	synchronized(cache.mutex)
+	{
+		if (t, ok := cache.entries[c.pol]; ok) {
+			c.tables = t;
+			return;
 		}
-		c.tables.out[b] = h;
-	}
 
-	// calculate table for reduction mod Polynomial
-	auto k = c.pol.Deg();
-	for (auto b = 0; b < 256; b++) {
-		// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
+		// calculate table for sliding out bytes. The byte to slide out is used as
+		// the index for the table, the value contains the following:
+		// out_table[b] = Hash(b || 0 ||        ...        || 0)
+		//                          \ windowsize-1 zero bytes /
+		// To slide out byte b_0 for window size w with known hash
+		// H := H(b_0 || ... || b_w), it is sufficient to add out_table[b_0]:
+		//    H(b_0 || ... || b_w) + H(b_0 || 0 || ... || 0)
+		//  = H(b_0 + b_0 || b_1 + 0 || ... || b_w + 0)
+		//  = H(    0     || b_1 || ...     || b_w)
 		//
-		// The 8 bits above deg(Polynomial) determine what happens next and so
-		// these bits are used as a lookup to this table. The value is split in
-		// two parts: Part A contains the result of the modulus operation, part
-		// B is used to cancel out the 8 top bits so that one XOR operation is
-		// enough to reduce modulo Polynomial
-		c.tables.mod[b] = Pol(ulong(b)<<uint(k)).Mod(c.pol) | (Pol(b) << uint(k));
-	}
+		// Afterwards a new byte can be shifted in.
+		for (auto b = 0; b < 256; b++) {
+			var h Pol;
 
-	cache.entries[c.pol] = c.tables;
+			h = appendByte(h, ubyte(b), c.pol);
+			for (auto i = 0; i < windowSize-1; i++) {
+				h = appendByte(h, 0, c.pol);
+			}
+			c.tables.out[b] = h;
+		}
+
+		// calculate table for reduction mod Polynomial
+		auto k = c.pol.Deg();
+		for (auto b = 0; b < 256; b++) {
+			// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
+			//
+			// The 8 bits above deg(Polynomial) determine what happens next and so
+			// these bits are used as a lookup to this table. The value is split in
+			// two parts: Part A contains the result of the modulus operation, part
+			// B is used to cancel out the 8 top bits so that one XOR operation is
+			// enough to reduce modulo Polynomial
+			c.tables.mod[b] = Pol(ulong(b)<<uint(k)).Mod(c.pol) | (Pol(b) << uint(k));
+		}
+
+		cache.entries[c.pol] = c.tables;
+	}
 }
 
 /// Next returns the position and length of the next chunk of data. If an error
