@@ -1,4 +1,4 @@
-// ----------------------------------------------------------- chunker.d
+// ----------------------------------------------------------- package.d
 /**
 Package chunker implements Content Defined Chunking (CDC) based on a rolling
 Rabin Checksum.
@@ -83,6 +83,8 @@ license that can be found in the LICENSE file.
 */
 
 module chunker;
+
+import chunker.polynomials;
 
 import std.stdio : File;
 
@@ -457,6 +459,11 @@ private Pol appendByte(Pol hash, ubyte b, Pol pol) {
 // ----------------------------------------------------------- chunker_test.d
 module chunker.chunker_test;
 
+import std.stdio : File;
+
+import chunker;
+import chunker.polynomials;
+
 private template parseDigest(string s)
 {
 	import std.conv : hexString;
@@ -596,7 +603,7 @@ version(unittest) private Chunk[] testWithData(Chunker* chnker, chunk[] testChun
 	return chunks;
 }
 
-version(unittest) private ubyte[] getRandom(int seed, int count) {
+package ubyte[] getRandom(int seed, int count) {
 	import std.random : Random, uniform;
 	auto buf = new ubyte[count];
 
@@ -620,7 +627,7 @@ version(unittest) private ubyte[32] hashData(ubyte[] d) {
 version(unittest) import std.array : replicate;
 
 // Temporary D shim
-version(unittest) private File bufFile(ubyte[] buf)
+package File bufFile(ubyte[] buf)
 {
 	File("temp.bin", "wb").rawWrite(buf);
 	return File("temp.bin", "rb");
@@ -791,6 +798,10 @@ version (benchmark) @(`BenchmarkNewChunker`) unittest {
 // ----------------------------------------------------------- example_test.d
 module chunker.example_test;
 
+import chunker;
+import chunker.chunker_test;
+import chunker.polynomials;
+
 void ExampleChunker() {
 	import std.stdio, std.digest.sha;
 
@@ -922,6 +933,8 @@ public string String(/*this*/ Pol x) {
 
 /// Expand returns the string representation of the polynomial x.
 public string Expand(/*this*/ Pol x) {
+	import std.format : format;
+
 	if (x == 0) {
 		return "0";
 	}
@@ -1105,6 +1118,11 @@ private Pol qp(uint p, Pol g) {
 
 // ----------------------------------------------------------- polynomials_test.d
 module chunker.polynomials_test;
+
+import chunker.polynomials;
+
+version(unittest) import std.format : format;
+version(unittest) import std.stdio : stderr;
 
 private struct polAddTest {
 	private Pol x, y;
