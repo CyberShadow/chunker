@@ -308,7 +308,7 @@ private void fillTables(/*this*/ Chunker* c) {
 /// current chunk is undefined. When the last chunk has been returned, all
 /// subsequent calls yield an io.EOF error.
 public Chunk Next(/*this*/ Chunker* c, ubyte[] data) {
-	data = data[];
+	data = data[0..0];
 	if (!c.config.tablesInitialized) {
 		throw new Exception("tables for polynomial computation not initialized");
 	}
