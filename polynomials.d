@@ -2,8 +2,6 @@ module chunker.polynomials;
 
 version(unittest) import std.format : format;
 version(unittest) import std.stdio : stderr;
-version = benchmark;
-version (benchmark) enum N = 1;
 
 /// Pol is a polynomial from F_2[X].
 struct Pol
@@ -237,15 +235,15 @@ struct Pol
 		}
 	}
 
-	unittest // benchmark
+	version(benchmarkPolynomials) private static void benchmarkPolDeg()
 	{
 		auto f = Pol(0x3af4b284899);
 		auto d = f.deg;
 		assert(d == 41,
-			format!"BenchmalPolDeg: Wrong degree %d returned, expected %d"
+			format!"BenchmarkPolDeg: Wrong degree %d returned, expected %d"
 			(d, 41));
 
-		for (auto i = 0; i < N; i++)
+		for (auto i = 0; i < Benchmark.N; i++)
 			f.deg;
 	}
 
@@ -316,12 +314,12 @@ struct Pol
 		return [q, x];
 	}
 
-	unittest // benchmark
+	version(benchmarkPolynomials) private static void benchmarkPolDivMod()
 	{
 		auto f = Pol(0x2482734cacca49);
 		auto g = Pol(0x3af4b284899);
 
-		for (auto i = 0; i < N; i++)
+		for (auto i = 0; i < Benchmark.N; i++)
 			divMod(g, f);
 	}
 
@@ -377,12 +375,12 @@ struct Pol
 		}
 	}
 
-	unittest // benchmark
+	version(benchmarkPolynomials) private static void benchmarkPolDiv()
 	{
 		auto f = Pol(0x2482734cacca49);
 		auto g = Pol(0x3af4b284899);
 
-		for (auto i = 0; i < N; i++)
+		for (auto i = 0; i < Benchmark.N; i++)
 			g / f;
 	}
 
@@ -436,12 +434,12 @@ struct Pol
 		}
 	}
 
-	unittest // benchmark
+	version(benchmarkPolynomials) private static void benchmarkPolMod()
 	{
 		auto f = Pol(0x2482734cacca49);
 		auto g = Pol(0x3af4b284899);
 
-		for (auto i = 0; i < N; i++)
+		for (auto i = 0; i < Benchmark.N; i++)
 			g % f;
 	}
 
@@ -466,9 +464,9 @@ struct Pol
 		getRandom();
 	}
 
-	unittest // benchmark
+	version(benchmarkPolynomials) private static void benchmarkPolGetRandom()
 	{
-		for (auto i = 0; i < N; i++)
+		for (auto i = 0; i < Benchmark.N; i++)
 			getRandom();
 	}
 
@@ -608,14 +606,14 @@ struct Pol
 		return true;
 	}
 
-	unittest
+	private
 	{
-		struct Test
+		struct IrredTest
 		{
 			private Pol f;
 			private bool irred;
 		}
-		Test[] tests =
+		static immutable IrredTest[] irredTests =
 		[
 			{Pol(0x38f1e565e288df), false},
 			{Pol(0x3DA3358B4DC173), true},
@@ -642,22 +640,28 @@ struct Pol
 			{Pol(0x39dfa4d13fb231), false},
 			{Pol(0x3143d0464b3299), false},
 		];
+	}
 
-		foreach (_, test; tests)
+	unittest
+	{
+		foreach (_, test; irredTests)
 			assert(test.f.irreducible == test.irred,
 				format!"Irreducibility test for Polynomial %s failed: got %s, wanted %s"
 				(test.f, test.f.irreducible, test.irred));
+	}
 
+	version(benchmarkPolynomials) private static void benchmarkPolIrreducible()
+	{
 		// find first irreducible polynomial
 		Pol pol;
-		foreach (_, test; tests)
+		foreach (_, test; irredTests)
 			if (test.irred)
 			{
 				pol = test.f;
 				break;
 			}
 
-		for (auto i = 0; i < N; i++)
+		for (auto i = 0; i < Benchmark.N; i++)
 			if (!pol.irreducible)
 				assert(false, format!"Irreducibility test for Polynomial %s failed"(pol));
 	}
@@ -737,4 +741,14 @@ struct Pol
 		// add x
 		return (res + Pol(2)) % g;
 	}
+}
+
+version (benchmarkPolynomials)
+{
+	import chunker.benchmark;
+	mixin BenchmarkThisModule;
+
+	static foreach (name; __traits(allMembers, Pol))
+		static if (name.length > 9 && name[0..9] == "benchmark")
+			mixin(`private void ` ~ name ~ `() { Pol.` ~ name ~ `(); }`);
 }
