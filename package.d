@@ -85,8 +85,6 @@ module chunker;
 
 import chunker.polynomials;
 
-import std.stdio : File;
-
 private enum kiB = 1024;
 private enum miB = 1024 * kiB;
 
@@ -120,330 +118,313 @@ static this()
 	cache.mutex = new Object;
 }
 
-/// Chunk is one content-dependent chunk of bytes whose end was cut when the
-/// Rabin Fingerprint had the value stored in Cut.
-public struct Chunk
-{
-	public uint start;
-	public uint length;
-	public ulong cut;
-	public ubyte[] data;
-}
-
-private struct ChunkerState
-{
-	private ubyte[windowSize] window;
-	private int wpos;
-
-	private ubyte[] buf;
-	private uint bpos;
-	private uint bmax;
-
-	private uint start;
-	private uint count;
-	private uint pos;
-
-	private uint pre; // wait for this many bytes before start calculating an new chunk
-
-	private ulong digest;
-}
-
-private struct ChunkerConfig
-{
-	public uint minSize, maxSize;
-
-	private Pol pol;
-	private uint polShift;
-	private Tables tables;
-	private bool tablesInitialized;
-	private ulong splitmask;
-
-	private File rd;
-	private bool closed;
-}
-
 /// Chunker splits content with Rabin Fingerprints.
-public struct Chunker
+struct Chunker(R)
 {
-	ChunkerConfig config;
-	ChunkerState state;
-}
-
-/// setAverageBits allows to control the frequency of chunk discovery:
-/// the lower averageBits, the higher amount of chunks will be identified.
-/// The default value is 20 bits, so chunks will be of 1MiB size on average.
-public void setAverageBits(/*this*/ Chunker* c, int averageBits)
-{
-	c.config.splitmask = (1 << ulong(averageBits)) - 1;
-}
-
-/// newChunker returns a new Chunker based on polynomial p that reads from rd.
-public Chunker* newChunker(File rd, Pol pol)
-{
-	return newChunkerWithBoundaries(rd, pol, minSize, maxSize);
-}
-
-/// newChunkerWithBoundaries returns a new Chunker based on polynomial p that reads from
-/// rd and custom min and max size boundaries.
-public Chunker* newChunkerWithBoundaries(File rd, Pol pol, uint min, uint max)
-{
-	Chunker v =
+	/// Chunk is one content-dependent chunk of bytes whose end was cut when the
+	/// Rabin Fingerprint had the value stored in Cut.
+	public struct Chunk
 	{
-		state:
-		{
-			buf: new ubyte[chunkerBufSize],
-		},
-		config:
-		{
-			pol:       pol,
-			rd:        rd,
-			minSize:   min,
-			maxSize:   max,
-			splitmask: (1 << 20) - 1, // aim to create chunks of 20 bits or about 1MiB on average.
-		},
-	};
-	auto c = [v].ptr;
-
-	c.reset();
-
-	return c;
-}
-
-/// reset reinitializes the chunker with a new reader and polynomial.
-public void reset(/*this*/ Chunker* c, File rd, Pol pol)
-{
-	c.resetWithBoundaries(rd, pol, minSize, maxSize);
-}
-
-/// ResetWithBoundaries reinitializes the chunker with a new reader, polynomial
-/// and custom min and max size boundaries.
-public void resetWithBoundaries(/*this*/ Chunker* c, File rd, Pol pol, uint min, uint max)
-{
-	Chunker v =
-	{
-		state:
-		{
-			buf: new ubyte[chunkerBufSize],
-		},
-		config:
-		{
-			pol:       pol,
-			rd:        rd,
-			minSize:   min,
-			maxSize:   max,
-			splitmask: (1 << 20) - 1, // aim to create chunks of 20 bits or about 1MiB on average.
-		},
-	};
-	*c = v;
-
-	c.reset();
-}
-
-private void reset(/*this*/ Chunker* c)
-{
-	c.config.polShift = uint(c.config.pol.deg() - 8);
-	c.fillTables();
-
-	for (auto i = 0; i < windowSize; i++)
-		c.state.window[i] = 0;
-
-	c.config.closed = false;
-	c.state.digest = 0;
-	c.state.wpos = 0;
-	c.state.count = 0;
-	c.state.digest = c.slide(c.state.digest, 1);
-	c.state.start = c.state.pos;
-
-	// do not start a new chunk unless at least minSize bytes have been read
-	c.state.pre = c.config.minSize - windowSize;
-}
-
-/// fillTables calculates out_table and mod_table for optimization. This
-/// implementation uses a cache in the global variable cache.
-private void fillTables(/*this*/ Chunker* c)
-{
-	// if polynomial hasn't been specified, do not compute anything for now
-	if (c.config.pol.value == 0)
-		return;
-
-	c.config.tablesInitialized = true;
-
-	// test if the tables are cached for this polynomial
-	synchronized(cache.mutex)
-	{
-		if (auto t = c.config.pol in cache.entries)
-		{
-			c.config.tables = *t;
-			return;
-		}
-
-		// calculate table for sliding out bytes. The byte to slide out is used as
-		// the index for the table, the value contains the following:
-		// out_table[b] = Hash(b || 0 ||        ...        || 0)
-		//                          \ windowsize-1 zero bytes /
-		// To slide out byte b_0 for window size w with known hash
-		// H := H(b_0 || ... || b_w), it is sufficient to add out_table[b_0]:
-		//    H(b_0 || ... || b_w) + H(b_0 || 0 || ... || 0)
-		//  = H(b_0 + b_0 || b_1 + 0 || ... || b_w + 0)
-		//  = H(    0     || b_1 || ...     || b_w)
-		//
-		// Afterwards a new byte can be shifted in.
-		for (auto b = 0; b < 256; b++)
-		{
-			Pol h;
-
-			h = appendByte(h, cast(ubyte)b, c.config.pol);
-			for (auto i = 0; i < windowSize-1; i++)
-				h = appendByte(h, 0, c.config.pol);
-			c.config.tables.out_[b] = h;
-		}
-
-		// calculate table for reduction mod Polynomial
-		auto k = c.config.pol.deg();
-		for (auto b = 0; b < 256; b++)
-		{
-			// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
-			//
-			// The 8 bits above deg(Polynomial) determine what happens next and so
-			// these bits are used as a lookup to this table. The value is split in
-			// two parts: Part A contains the result of the modulus operation, part
-			// B is used to cancel out the 8 top bits so that one XOR operation is
-			// enough to reduce modulo Polynomial
-			c.config.tables.mod[b] = Pol((Pol(ulong(b)<<uint(k)) % c.config.pol).value | (Pol.Base(b) << uint(k)));
-		}
-
-		cache.entries[c.config.pol] = c.config.tables;
+		public uint start;
+		public uint length;
+		public ulong cut;
+		public ubyte[] data;
 	}
-}
 
-/// next returns the position and length of the next chunk of data. If an error
-/// occurs while reading, the error is returned. Afterwards, the state of the
-/// current chunk is undefined. When the last chunk has been returned, all
-/// subsequent calls yield an io.EOF error.
-public Chunk next(/*this*/ Chunker* c, ubyte[] data)
-{
-	data = data[0..0];
-	if (!c.config.tablesInitialized)
-		throw new Exception("tables for polynomial computation not initialized");
-
-	auto tabout = c.config.tables.out_;
-	auto tabmod = c.config.tables.mod;
-	auto polShift = c.config.polShift;
-	auto minSize = c.config.minSize;
-	auto maxSize = c.config.maxSize;
-	auto buf = c.state.buf;
-	while (true)
+	private struct State
 	{
-		if (c.state.bpos >= c.state.bmax)
+		private ubyte[windowSize] window;
+		private int wpos;
+
+		private ubyte[] buf;
+		private uint bpos;
+		private uint bmax;
+
+		private uint start;
+		private uint count;
+		private uint pos;
+
+		private uint pre; // wait for this many bytes before start calculating an new chunk
+
+		private ulong digest;
+	}
+
+	private struct Config
+	{
+		public uint minSize, maxSize;
+
+		private Pol pol;
+		private uint polShift;
+		private Tables tables;
+		private bool tablesInitialized;
+		private ulong splitmask;
+
+		private R rd;
+		private bool closed;
+	}
+
+	Config config;
+	State state;
+
+	/// setAverageBits allows to control the frequency of chunk discovery:
+	/// the lower averageBits, the higher amount of chunks will be identified.
+	/// The default value is 20 bits, so chunks will be of 1MiB size on average.
+	public void setAverageBits(int averageBits)
+	{
+		config.splitmask = (1 << ulong(averageBits)) - 1;
+	}
+
+	/// Constructs a new Chunker based on polynomial p that reads from rd.
+	public this(R rd, Pol pol)
+	{
+		this(rd, pol, minSize, maxSize);
+	}
+
+	/// Constructs a new Chunker based on polynomial p that reads from
+	/// rd and custom min and max size boundaries.
+	public this(R rd, Pol pol, uint min, uint max)
+	{
+		resetWithBoundaries(rd, pol, minSize, maxSize);
+	}
+
+	/// reset reinitializes the chunker with a new reader and polynomial.
+	public void reset(R rd, Pol pol)
+	{
+		resetWithBoundaries(rd, pol, minSize, maxSize);
+	}
+
+	/// resetWithBoundaries reinitializes the chunker with a new reader, polynomial
+	/// and custom min and max size boundaries.
+	public void resetWithBoundaries(R rd, Pol pol, uint min, uint max)
+	{
+		state = State();
+		state.buf = new ubyte[chunkerBufSize];
+		config = Config();
+		config.pol = pol;
+		config.rd = rd;
+		config.minSize = min;
+		config.maxSize = max;
+		config.splitmask = (1 << 20) - 1; // aim to create chunks of 20 bits or about 1MiB on average.
+		reset();
+	}
+
+	private void reset()
+	{
+		config.polShift = uint(config.pol.deg() - 8);
+		fillTables();
+
+		for (auto i = 0; i < windowSize; i++)
+			state.window[i] = 0;
+
+		config.closed = false;
+		state.digest = 0;
+		state.wpos = 0;
+		state.count = 0;
+		state.digest = slide(state.digest, 1);
+		state.start = state.pos;
+
+		// do not start a new chunk unless at least minSize bytes have been read
+		state.pre = config.minSize - windowSize;
+	}
+
+	/// fillTables calculates out_table and mod_table for optimization. This
+	/// implementation uses a cache in the global variable cache.
+	private void fillTables()
+	{
+		// if polynomial hasn't been specified, do not compute anything for now
+		if (config.pol.value == 0)
+			return;
+
+		config.tablesInitialized = true;
+
+		// test if the tables are cached for this polynomial
+		synchronized(cache.mutex)
 		{
-			auto n = c.config.rd.rawRead(buf[]).length;
-
-			// There are no more bytes to buffer, so this was the last
-			// chunk.
-			if (n == 0 && !c.config.closed)
+			if (auto t = config.pol in cache.entries)
 			{
-				c.config.closed = true;
+				config.tables = *t;
+				return;
+			}
 
-				// return current chunk, if any bytes have been processed
-				if (c.state.count > 0)
-					return Chunk
+			// calculate table for sliding out bytes. The byte to slide out is used as
+			// the index for the table, the value contains the following:
+			// out_table[b] = Hash(b || 0 ||        ...        || 0)
+			//                          \ windowsize-1 zero bytes /
+			// To slide out byte b_0 for window size w with known hash
+			// H := H(b_0 || ... || b_w), it is sufficient to add out_table[b_0]:
+			//    H(b_0 || ... || b_w) + H(b_0 || 0 || ... || 0)
+			//  = H(b_0 + b_0 || b_1 + 0 || ... || b_w + 0)
+			//  = H(    0     || b_1 || ...     || b_w)
+			//
+			// Afterwards a new byte can be shifted in.
+			for (auto b = 0; b < 256; b++)
+			{
+				Pol h;
+
+				h = appendByte(h, cast(ubyte)b, config.pol);
+				for (auto i = 0; i < windowSize-1; i++)
+					h = appendByte(h, 0, config.pol);
+				config.tables.out_[b] = h;
+			}
+
+			// calculate table for reduction mod Polynomial
+			auto k = config.pol.deg();
+			for (auto b = 0; b < 256; b++)
+			{
+				// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
+				//
+				// The 8 bits above deg(Polynomial) determine what happens next and so
+				// these bits are used as a lookup to this table. The value is split in
+				// two parts: Part A contains the result of the modulus operation, part
+				// B is used to cancel out the 8 top bits so that one XOR operation is
+				// enough to reduce modulo Polynomial
+				config.tables.mod[b] = Pol((Pol(ulong(b)<<uint(k)) % config.pol).value | (Pol.Base(b) << uint(k)));
+			}
+
+			cache.entries[config.pol] = config.tables;
+		}
+	}
+
+	/// next returns the position and length of the next chunk of data. If an error
+	/// occurs while reading, the error is returned. Afterwards, the state of the
+	/// current chunk is undefined. When the last chunk has been returned, all
+	/// subsequent calls yield an io.EOF error.
+	public Chunk next(ubyte[] data)
+	{
+		data = data[0..0];
+		if (!config.tablesInitialized)
+			throw new Exception("tables for polynomial computation not initialized");
+
+		auto tabout = config.tables.out_;
+		auto tabmod = config.tables.mod;
+		auto polShift = config.polShift;
+		auto minSize = config.minSize;
+		auto maxSize = config.maxSize;
+		auto buf = state.buf;
+		while (true)
+		{
+			if (state.bpos >= state.bmax)
+			{
+				auto n = config.rd.rawRead(buf[]).length;
+
+				// There are no more bytes to buffer, so this was the last
+				// chunk.
+				if (n == 0 && !config.closed)
+				{
+					config.closed = true;
+
+					// return current chunk, if any bytes have been processed
+					if (state.count > 0)
+						return Chunk
+						(
+							/*Start: */ state.start,
+							/*Length:*/ state.count,
+							/*Cut:   */ state.digest,
+							/*Data:  */ data,
+						);
+				}
+
+				if (n == 0)
+					return Chunk.init;
+
+				state.bpos = 0;
+				state.bmax = cast(uint)n;
+			}
+
+			// check if bytes have to be dismissed before starting a new chunk
+			if (state.pre > 0)
+			{
+				auto n = state.bmax - state.bpos;
+				if (state.pre > uint(n))
+				{
+					state.pre -= uint(n);
+					data ~= buf[state.bpos .. state.bmax];
+
+					state.count += uint(n);
+					state.pos += uint(n);
+					state.bpos = state.bmax;
+
+					continue;
+				}
+
+				data ~= buf[state.bpos .. state.bpos+state.pre];
+
+				state.bpos += state.pre;
+				state.count += state.pre;
+				state.pos += state.pre;
+				state.pre = 0;
+			}
+
+			auto add = state.count;
+			auto digest = state.digest;
+			auto win = state.window;
+			auto wpos = state.wpos;
+			foreach (_, b; buf[state.bpos .. state.bmax])
+			{
+				// slide(b)
+				auto out_ = win[wpos];
+				win[wpos] = b;
+				digest ^= ulong(tabout[out_].value);
+				wpos++;
+				if (wpos >= windowSize)
+					wpos = 0;
+
+				// updateDigest
+				auto index = cast(ubyte)(digest >> polShift);
+				digest <<= 8;
+				digest |= ulong(b);
+
+				digest ^= ulong(tabmod[index].value);
+				// end manual inline
+
+				add++;
+				if (add < minSize)
+					continue;
+
+				if ((digest&config.splitmask) == 0 || add >= maxSize)
+				{
+					auto i = add - state.count - 1;
+					data ~= state.buf[state.bpos .. state.bpos+uint(i)+1];
+					state.count = add;
+					state.pos += uint(i) + 1;
+					state.bpos += uint(i) + 1;
+					state.buf = buf;
+
+					auto chunk = Chunk
 					(
-						/*Start: */ c.state.start,
-						/*Length:*/ c.state.count,
-						/*Cut:   */ c.state.digest,
+						/*Start: */ state.start,
+						/*Length:*/ state.count,
+						/*Cut:   */ digest,
 						/*Data:  */ data,
 					);
+
+					reset();
+
+					return chunk;
+				}
 			}
+			state.digest = digest;
+			state.window = win;
+			state.wpos = wpos;
 
-			if (n == 0)
-				return Chunk.init;
-
-			c.state.bpos = 0;
-			c.state.bmax = cast(uint)n;
+			auto steps = state.bmax - state.bpos;
+			if (steps > 0)
+				data ~= state.buf[state.bpos .. state.bpos+steps];
+			state.count += steps;
+			state.pos += steps;
+			state.bpos = state.bmax;
 		}
+	}
 
-		// check if bytes have to be dismissed before starting a new chunk
-		if (c.state.pre > 0)
-		{
-			auto n = c.state.bmax - c.state.bpos;
-			if (c.state.pre > uint(n))
-			{
-				c.state.pre -= uint(n);
-				data ~= buf[c.state.bpos .. c.state.bmax];
+	private ulong slide(ulong digest, ubyte b)
+	{
+		auto out_ = state.window[state.wpos];
+		state.window[state.wpos] = b;
+		digest ^= ulong(config.tables.out_[out_].value);
+		state.wpos = (state.wpos + 1) % windowSize;
 
-				c.state.count += uint(n);
-				c.state.pos += uint(n);
-				c.state.bpos = c.state.bmax;
-
-				continue;
-			}
-
-			data ~= buf[c.state.bpos .. c.state.bpos+c.state.pre];
-
-			c.state.bpos += c.state.pre;
-			c.state.count += c.state.pre;
-			c.state.pos += c.state.pre;
-			c.state.pre = 0;
-		}
-
-		auto add = c.state.count;
-		auto digest = c.state.digest;
-		auto win = c.state.window;
-		auto wpos = c.state.wpos;
-		foreach (_, b; buf[c.state.bpos .. c.state.bmax])
-		{
-			// slide(b)
-			auto out_ = win[wpos];
-			win[wpos] = b;
-			digest ^= ulong(tabout[out_].value);
-			wpos++;
-			if (wpos >= windowSize)
-				wpos = 0;
-
-			// updateDigest
-			auto index = cast(ubyte)(digest >> polShift);
-			digest <<= 8;
-			digest |= ulong(b);
-
-			digest ^= ulong(tabmod[index].value);
-			// end manual inline
-
-			add++;
-			if (add < minSize)
-				continue;
-
-			if ((digest&c.config.splitmask) == 0 || add >= maxSize)
-			{
-				auto i = add - c.state.count - 1;
-				data ~= c.state.buf[c.state.bpos .. c.state.bpos+uint(i)+1];
-				c.state.count = add;
-				c.state.pos += uint(i) + 1;
-				c.state.bpos += uint(i) + 1;
-				c.state.buf = buf;
-
-				auto chunk = Chunk
-				(
-					/*Start: */ c.state.start,
-					/*Length:*/ c.state.count,
-					/*Cut:   */ digest,
-					/*Data:  */ data,
-				);
-
-				c.reset();
-
-				return chunk;
-			}
-		}
-		c.state.digest = digest;
-		c.state.window = win;
-		c.state.wpos = wpos;
-
-		auto steps = c.state.bmax - c.state.bpos;
-		if (steps > 0)
-			data ~= c.state.buf[c.state.bpos .. c.state.bpos+steps];
-		c.state.count += steps;
-		c.state.pos += steps;
-		c.state.bpos = c.state.bmax;
+		digest = updateDigest(digest, config.polShift, config.tables, b);
+		return digest;
 	}
 }
 
@@ -454,17 +435,6 @@ private ulong /*newDigest*/ updateDigest(ulong digest, uint polShift, Tables tab
 	digest |= ulong(b);
 
 	digest ^= ulong(tab.mod[index].value);
-	return digest;
-}
-
-private ulong /*newDigest*/ slide(/*this*/ Chunker* c, ulong digest, ubyte b)
-{
-	auto out_ = c.state.window[c.state.wpos];
-	c.state.window[c.state.wpos] = b;
-	digest ^= ulong(c.config.tables.out_[out_].value);
-	c.state.wpos = (c.state.wpos + 1) % windowSize;
-
-	digest = updateDigest(digest, c.config.polShift, c.config.tables, b);
 	return digest;
 }
 
@@ -507,6 +477,7 @@ version(unittest) private ubyte[32] hashData(ubyte[] d)
 }
 
 // Temporary D shim
+import std.stdio : File;
 package File bufFile(ubyte[] buf)
 {
 	File("temp.bin", "wb").rawWrite(buf);
@@ -613,9 +584,9 @@ TestChunk[] chunks3 =
 
 version(unittest) import std.format;
 
-version(unittest) private Chunk[] testWithData(Chunker* chnker, TestChunk[] testChunks, bool checkDigest)
+version(unittest) private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] testChunks, bool checkDigest)
 {
-	Chunk[] chunks;
+	Chunker!R.Chunk[] chunks;
 
 	auto pos = uint(0);
 	foreach (i, chunk; testChunks)
@@ -647,7 +618,7 @@ version(unittest) private Chunk[] testWithData(Chunker* chnker, TestChunk[] test
 	}
 
 	auto c = chnker.next(null);
-	if (c !is Chunk.init)
+	if (c !is typeof(c).init)
 		assert(false, "Wrong error returned after last chunk");
 
 	assert(chunks.length == testChunks.length,
@@ -662,12 +633,12 @@ version(unittest) import std.array : replicate;
 {
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = newChunker(bufFile(buf), testPol);
-	testWithData(ch, chunks1, true);
+	auto ch = Chunker!File(bufFile(buf), testPol);
+	testWithData!File(ch, chunks1, true);
 
 	// setup nullbyte data source
 	buf = replicate([ubyte(0)], chunks2.length*minSize);
-	ch = newChunker(bufFile(buf), testPol);
+	ch = Chunker!File(bufFile(buf), testPol);
 
 	testWithData(ch, chunks2, true);
 }
@@ -675,7 +646,7 @@ version(unittest) import std.array : replicate;
 @(`ChunkerWithCustomAverageBits`) unittest
 {
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = newChunker(bufFile(buf), testPol);
+	auto ch = Chunker!File(bufFile(buf), testPol);
 
 	// sligthly decrease averageBits to get more chunks
 	ch.setAverageBits(19);
@@ -685,7 +656,7 @@ version(unittest) import std.array : replicate;
 @(`ChunkerReset`) unittest
 {
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = newChunker(bufFile(buf), testPol);
+	auto ch = Chunker!File(bufFile(buf), testPol);
 	testWithData(ch, chunks1, true);
 
 	ch.reset(bufFile(buf), testPol);
@@ -706,7 +677,7 @@ version(unittest) import std.stdio : stderr;
 	stderr.writefln!"generating random polynomial took %s"(Clock.currTime() - start);
 
 	start = Clock.currTime();
-	auto ch = newChunker(bufFile(buf), p);
+	auto ch = Chunker!File(bufFile(buf), p);
 	stderr.writefln!"creating chunker took %s"(Clock.currTime() - start);
 
 	// make sure that first chunk is different
@@ -727,7 +698,7 @@ version(unittest) import std.stdio : stderr;
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
 
-	auto ch = newChunker(bufFile(buf), testPol);
+	auto ch = Chunker!File(bufFile(buf), testPol);
 	auto chunks = testWithData(ch, chunks1, false);
 
 	// test reader
@@ -744,7 +715,7 @@ version(unittest) import std.stdio : stderr;
 
 	// setup nullbyte data source
 	buf = replicate([ubyte(0)], chunks2.length*minSize);
-	ch = newChunker(bufFile(buf), testPol);
+	ch = Chunker!File(bufFile(buf), testPol);
 
 	testWithData(ch, chunks2, false);
 }
@@ -756,7 +727,7 @@ version (benchmark) void benchmarkChunker(bool checkDigest)
 {
 	auto size = 32 * 1024 * 1024;
 	auto rd = bufFile(getRandom(23, size));
-	auto ch = newChunker(rd, testPol);
+	auto ch = Chunker!File(rd, testPol);
 	auto buf = new ubyte[maxSize];
 
 	// b.ResetTimer();
@@ -776,7 +747,7 @@ version (benchmark) void benchmarkChunker(bool checkDigest)
 		{
 			auto chunk = ch.next(buf);
 
-			if (chunk is Chunk.init)
+			if (chunk is typeof(chunk).init)
 			{
 				break;
 			}
@@ -822,7 +793,5 @@ version (benchmark) @(`BenchmarkNewChunker`) unittest
 	// b.ResetTimer();
 
 	for (auto i = 0; i < N; i++)
-	{
-		newChunker(bufFile(null), p);
-	}
+		Chunker!File(bufFile(null), p);
 }

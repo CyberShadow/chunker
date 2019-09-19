@@ -11,7 +11,7 @@ void main()
 	auto data = getRandom(23, 32*1024*1024);
 
 	// create a chunker
-	auto chunker = newChunker(bufFile(data), Pol(0x3DA3358B4DC173));
+	auto chunker = Chunker!File(bufFile(data), Pol(0x3DA3358B4DC173));
 
 	// reuse this buffer
 	auto buf = new ubyte[8*1024*1024];
@@ -19,7 +19,7 @@ void main()
 	for (auto i = 0; i < 5; i++)
 	{
 		auto chunk = chunker.next(buf);
-		if (chunk is Chunk.init)
+		if (chunk is typeof(chunk).init)
 			break;
 
 		writefln!"%d %(%02x%)"(chunk.length, sha256Of(chunk.data));
