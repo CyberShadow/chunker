@@ -56,32 +56,33 @@ mixin template BenchmarkThisModule()
 
 			alias mod = __traits(parent, main);
 			foreach (name; __traits(allMembers, mod))
-			{
-				alias member = __traits(getMember, mod, name);
-				static if (__traits(isStaticFunction, member))
+				static if (is(typeof(__traits(getMember, mod, name))))
 				{
-					static if (name.length > 9 && name[0..9] == "benchmark")
+					alias member = __traits(getMember, mod, name);
+					static if (__traits(isStaticFunction, member))
 					{
-						bool found = false;
-						foreach (mask; benchmarks)
-							if (globMatch(name[9..$], mask))
-							{
-								found = true;
-								break;
-							}
-						if (!found)
-							continue;
+						static if (name.length > 9 && name[0..9] == "benchmark")
+						{
+							bool found = false;
+							foreach (mask; benchmarks)
+								if (globMatch(name[9..$], mask))
+								{
+									found = true;
+									break;
+								}
+							if (!found)
+								continue;
 
-						stderr.writefln("Running benchmark %s.%s (%d iterations):",
-							__traits(identifier, mod), name[9..$], N);
-						sw.reset();
-						sw.start();
-						member();
-						auto time = sw.peek();
-						stderr.writefln("  -> %s", time);
+							stderr.writefln("Running benchmark %s.%s (%d iterations):",
+								__traits(identifier, mod), name[9..$], N);
+							sw.reset();
+							sw.start();
+							member();
+							auto time = sw.peek();
+							stderr.writefln("  -> %s", time);
+						}
 					}
 				}
-			}
 		}
 	}
 }

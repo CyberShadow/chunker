@@ -470,7 +470,7 @@ package ubyte[] getRandom(int seed, int count)
 	return buf;
 }
 
-version(unittest) private ubyte[32] hashData(ubyte[] d)
+package ubyte[32] hashData(ubyte[] d)
 {
 	import std.digest.sha;
 	return sha256Of(d);
@@ -485,7 +485,9 @@ package File bufFile(ubyte[] buf)
 }
 
 // -----------------------------------------------------------------------------
-version(unittest):
+version(unittest) version = test;
+version(benchmarkChunker) version = test;
+version(test):
 private:
 
 private template parseDigest(string s)
@@ -582,9 +584,9 @@ TestChunk[] chunks3 =
 	{237392, 0x0000000000000001, parseDigest!"fcd567f5d866357a8e299fd5b2359bb2c8157c30395229c4e9b0a353944a7978"},
 ];
 
-version(unittest) import std.format;
+import std.format;
 
-version(unittest) private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] testChunks, bool checkDigest)
+private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] testChunks, bool checkDigest)
 {
 	Chunker!R.Chunk[] chunks;
 
@@ -627,7 +629,7 @@ version(unittest) private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker
 	return chunks;
 }
 
-version(unittest) import std.array : replicate;
+import std.array : replicate;
 
 @(`Chunker`) unittest
 {
@@ -663,7 +665,7 @@ version(unittest) import std.array : replicate;
 	testWithData(ch, chunks1, true);
 }
 
-version(unittest) import std.stdio : stderr;
+import std.stdio : stderr;
 
 @(`ChunkerWithRandomPolynomial`) unittest
 {

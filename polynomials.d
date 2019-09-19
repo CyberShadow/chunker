@@ -1,8 +1,5 @@
 module chunker.polynomials;
 
-version(unittest) import std.format : format;
-version(unittest) import std.stdio : stderr;
-
 /// Pol is a polynomial from F_2[X].
 struct Pol
 {
@@ -751,4 +748,9 @@ version (benchmarkPolynomials)
 	static foreach (name; __traits(allMembers, Pol))
 		static if (name.length > 9 && name[0..9] == "benchmark")
 			mixin(`private void ` ~ name ~ `() { Pol.` ~ name ~ `(); }`);
+	version = test;
 }
+version(unittest) version = test;
+version(test) import std.format : format;
+version(test) import std.stdio : stderr;
+
