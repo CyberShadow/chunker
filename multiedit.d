@@ -326,7 +326,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 				err = e; // TODO
 
 			if (err == io.ErrUnexpectedEOF) {
-				err = nil;
+				err = null;
 			}
 
 			// io.ReadFull only returns io.EOF when no bytes could be read. If
@@ -348,7 +348,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 				}
 			}
 
-			if (err != nil) {
+			if (err != null) {
 				return Chunk(), err;
 			}
 
@@ -422,7 +422,7 @@ public void Next(/*this*/ Chunker* c, ubyte[] data) (Chunk, error) {
 
 				c.reset();
 
-				return chunk, nil;
+				return chunk, null;
 			}
 		}
 		c.digest = digest;
@@ -564,7 +564,7 @@ private Chunk[] testWithData(Chunker* chnker, chunk[] testChunks, bool checkDige
 
 	auto pos = uint(0);
 	foreach (i, chunk; testChunks) {
-		auto c = chnker.Next(nil);
+		auto c = chnker.Next(null);
 
 		if (c.Start != pos) {
 			t.Fatalf("Start for chunk %d does not match: expected %d, got %d",
@@ -595,7 +595,7 @@ private Chunk[] testWithData(Chunker* chnker, chunk[] testChunks, bool checkDige
 
 	Exception err;
 	try
-		chnker.Next(nil);
+		chnker.Next(null);
 	catch (Exception e)
 		err = e;
 	if (err != io.EOF) {
@@ -627,7 +627,7 @@ private ubyte[] getRandom(long seed, int count) {
 private ubyte[] hashData(ubyte[] d) {
 	auto h = sha256.New();
 	h.Write(d);
-	return h.Sum(nil);
+	return h.Sum(null);
 }
 
 @(`Chunker`) unittest {
@@ -675,7 +675,7 @@ private ubyte[] hashData(ubyte[] d) {
 	t.Logf("creating chunker took %v", time.Since(start));
 
 	// make sure that first chunk is different
-	auto c = ch.Next(nil);
+	auto c = ch.Next(null);
 
 	if (c.Cut == chunks1[0].CutFP) {
 		t.Fatal("Cut point is the same");
@@ -735,7 +735,7 @@ void benchmarkChunker(bool checkDigest) {
 			rd.Seek(0, 0);
 		catch (Exception e)
 			err = e;
-		if (err != nil) {
+		if (err != null) {
 			b.Fatalf("Seek() return error %v", err);
 		}
 
@@ -753,7 +753,7 @@ void benchmarkChunker(bool checkDigest) {
 				break;
 			}
 
-			if (err != nil) {
+			if (err != null) {
 				b.Fatalf("Unexpected error occurred: %v", err);
 			}
 
@@ -797,7 +797,7 @@ void benchmarkChunker(bool checkDigest) {
 	b.ResetTimer();
 
 	for (auto i = 0; i < b.N; i++) {
-		New(bytes.NewBuffer(nil), p);
+		New(bytes.NewBuffer(null), p);
 	}
 }
 
@@ -824,7 +824,7 @@ void ExampleChunker() {
 			break;
 		}
 
-		if (err != nil) {
+		if (err != null) {
 			panic(err);
 		}
 
@@ -1028,7 +1028,7 @@ public Pol DerivePolynomial(File source) {
 
 		// choose polynomial at (pseudo)random
 		auto err = binary.Read(source, binary.LittleEndian, &f);
-		if (err != nil) {
+		if (err != null) {
 			return 0, err;
 		}
 
@@ -1041,7 +1041,7 @@ public Pol DerivePolynomial(File source) {
 
 		// test if f is irreducible
 		if (f.Irreducible()) {
-			return f, nil;
+			return f, null;
 		}
 	}
 
@@ -1125,7 +1125,7 @@ private Pol qp(uint p, Pol g) {
 public ubyte[] MarshalJSON(/*this*/ Pol x) {
 	auto buf = strconv.AppendUint([ubyte('"')], ulong(x), 16);
 	buf ~= '"';
-	return buf, nil;
+	return buf, null;
 }
 
 /// UnmarshalJSON parses a Pol from the JSON data.
@@ -1136,7 +1136,7 @@ public void UnmarshalJSON(/*this*/ Pol* x, ubyte[] data) {
 	auto n = strconv.ParseUint(string(data[1 .. len(data)-1]), 16, 64);
 	*x = Pol(n);
 
-	return nil;
+	return null;
 }
 
 // ----------------------------------------------------------- polynomials_test.d
