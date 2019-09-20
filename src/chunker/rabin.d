@@ -204,6 +204,24 @@ struct RabinHash
 			writer.slide(b);
 	}
 
+	/// Keep sliding in `bytes` until `digest & mask == 0`.
+	/// Return number of bytes written, which will always be
+	/// less than `bytes.length` if `mask` matched.
+	size_t putUntil(R)(R bytes, Digest mask)
+	{
+		auto writer = getWriter();
+		scope(success) commit(writer);
+		size_t c = 0;
+		foreach (b; bytes)
+		{
+			if ((writer.peek & mask) == 0)
+				break;
+			writer.slide(b);
+			c++;
+		}
+		return c;
+	}
+
 	/// Implementation for `slide`.
 	private static void slideImpl(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, in ref Pol[256] tabmod, uint polShift, ubyte b)
 	{
