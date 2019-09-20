@@ -398,9 +398,6 @@ struct Chunker(R)
 		if (!state.hash.tablesInitialized)
 			throw new Exception("tables for polynomial computation not initialized");
 
-		auto tabout = &state.hash.tables.out_;
-		auto tabmod = &state.hash.tables.mod;
-		auto polShift = state.hash.polShift;
 		auto minSize = config.minSize;
 		auto maxSize = config.maxSize;
 		auto buf = state.buf;
