@@ -125,8 +125,6 @@ struct Chunker(R)
 
 		/// Buffer used to receive and keep read data in.
 		ubyte[] buf;
-		/// Current read position within `buf`.
-		size_t bpos;
 
 		/// Buffer used to copy chunk data to.
 		ubyte[] cbuf;
@@ -171,8 +169,8 @@ struct Chunker(R)
 
 	private void copyBytes(size_t numBytes)
 	{
-		auto bytes = this.buf[this.bpos .. this.bpos + numBytes];
-		this.bpos += numBytes;
+		auto bytes = this.buf[0 .. numBytes];
+		this.buf = this.buf[numBytes .. $];
 		auto newLen = this.count + bytes.length;
 		if (this.cbuf.length < newLen)
 			this.cbuf.length = newLen;
@@ -197,7 +195,7 @@ struct Chunker(R)
 
 		while (true)
 		{
-			if (this.bpos >= this.buf.length)
+			if (this.buf.length == 0)
 			{
 				if (this.rd.empty)
 				{
@@ -223,7 +221,6 @@ struct Chunker(R)
 				}
 
 				this.buf = this.rd.front;
-				this.bpos = 0;
 			}
 
 			auto bmax = this.buf.length;
@@ -231,7 +228,7 @@ struct Chunker(R)
 			// check if bytes have to be dismissed before starting a new chunk
 			if (pre > 0)
 			{
-				auto n = bmax - this.bpos;
+				auto n = bmax;
 				if (pre > n)
 				{
 					pre -= n;
@@ -241,11 +238,12 @@ struct Chunker(R)
 				}
 
 				copyBytes(pre);
+				bmax -= pre;
 				pre = 0;
 			}
 
 			auto add = this.count;
-			auto bpos = this.bpos;
+			auto bpos = 0;
 			if (add < minSize)
 			{
 				auto warmUp = minSize - add;
@@ -269,7 +267,7 @@ struct Chunker(R)
 				break;
 			}
 
-			auto steps = bmax - this.bpos;
+			auto steps = bmax;
 			copyBytes(steps);
 		}
 		front = Chunk(this.cbuf[0 .. this.count], this.hash.peek());
