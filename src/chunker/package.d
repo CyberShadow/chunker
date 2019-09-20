@@ -206,46 +206,61 @@ private struct Hash
 	/// Current contents of the sliding window.
 	private ubyte[windowSize] window;
 
-	struct FastState
+	/// Contains frequently-accessed scalar values.
+	/// See Writer for details.
+	private struct Scalars
 	{
 		/// Sliding window cursor.
 		private size_t wpos;
 
 		/// Current hash digest value.
 		private Digest digest;
-
-		/// Pointer to the sliding window.
-		private ubyte[windowSize]* window;
 	}
-	private FastState fastState;
-
-	FastState getFastState()
-	{
-		auto result = fastState;
-		result.window = &this.window;
-		return result;
-	}
+	Scalars scalars;
 
 	void start()
 	{
 		foreach (i; 0 .. windowSize)
 			window[i] = 0;
-		fastState.digest = 0;
-		fastState.wpos = 0;
+		scalars.digest = 0;
+		scalars.wpos = 0;
 	}
 
-	@property Digest peek() { return fastState.digest; }
+	@property Digest peek() const { return scalars.digest; }
 
 	Digest finish()
 	{
-		auto result = fastState.digest;
+		auto result = scalars.digest;
 		start();
 		return result;
 	}
 
+	// ---------------------------------------------------------------------
+
+	/// Type for fast writing of successive bytes.
+	/// Must contain only scalar values, so that optimizing compilers
+	/// may break it up and place the fields in registers.
+	struct Writer
+	{
+		Scalars scalars;
+		Hash* hash;
+		@property Digest peek() const { return scalars.digest; }
+	}
+
+	Writer getWriter()
+	{
+		return Writer(scalars, &this);
+	}
+
+	void commit(ref Writer writer)
+	{
+		assert(writer.hash == &this);
+		this.scalars = writer.scalars;
+	}
+
 	public void slide(ubyte b)
 	{
-		slide(window, fastState.wpos, fastState.digest, tables.out_, tables.mod, polShift, b);
+		slide(window, scalars.wpos, scalars.digest, tables.out_, tables.mod, polShift, b);
 	}
 
 	public static void slide(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, in ref Pol[256] tabmod, uint polShift, ubyte b)
@@ -436,16 +451,16 @@ struct Chunker(R)
 			}
 
 			auto add = state.count;
-			auto hash = state.hash.getFastState();
+			auto hashWriter = state.hash.getWriter();
 			foreach (_, b; buf[state.bpos .. state.bmax])
 			{
-				Hash.slide(*hash.window, hash.wpos, hash.digest, *tabout, *tabmod, polShift, b);
+				Hash.slide(state.hash.window, hashWriter.scalars.wpos, hashWriter.scalars.digest, *tabout, *tabmod, polShift, b);
 
 				add++;
 				if (add < minSize)
 					continue;
 
-				if ((hash.digest&config.splitmask) == 0 || add >= maxSize)
+				if ((hashWriter.peek()&config.splitmask) == 0 || add >= maxSize)
 				{
 					auto i = add - state.count;
 					data ~= state.buf[state.bpos .. state.bpos+i];
@@ -457,7 +472,7 @@ struct Chunker(R)
 					(
 						/*Start: */ state.start,
 						/*Length:*/ state.count,
-						/*Cut:   */ hash.digest,
+						/*Cut:   */ hashWriter.peek(),
 						/*Data:  */ data,
 					);
 
@@ -466,7 +481,7 @@ struct Chunker(R)
 					return chunk;
 				}
 			}
-			state.hash.fastState = hash;
+			state.hash.commit(hashWriter);
 
 			auto steps = state.bmax - state.bpos;
 			if (steps > 0)
