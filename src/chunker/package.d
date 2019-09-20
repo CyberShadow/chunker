@@ -243,7 +243,12 @@ private struct Hash
 		return result;
 	}
 
-	private static void slide(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, in ref Pol[256] tabmod, uint polShift, ubyte b)
+	public void slide(ubyte b)
+	{
+		slide(window, fastState.wpos, fastState.digest, tables.out_, tables.mod, polShift, b);
+	}
+
+	public static void slide(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, in ref Pol[256] tabmod, uint polShift, ubyte b)
 	{
 		auto out_ = window[wpos];
 		window[wpos] = b;
@@ -354,7 +359,7 @@ struct Chunker(R)
 		state.hash.start();
 
 		config.closed = false;
-		slide(1);
+		state.hash.slide(1);
 		state.start = state.pos;
 
 		// do not start a new chunk unless at least minSize bytes have been read
@@ -469,11 +474,6 @@ struct Chunker(R)
 			state.pos += steps;
 			state.bpos = state.bmax;
 		}
-	}
-
-	private void slide(ubyte b)
-	{
-		Hash.slide(state.hash.window, state.hash.fastState.wpos, state.hash.fastState.digest, state.hash.tables.out_, state.hash.tables.mod, state.hash.polShift, b);
 	}
 }
 
