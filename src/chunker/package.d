@@ -136,9 +136,6 @@ struct Chunker(R)
 		@property size_t count() { return pos - start; }
 		/// Current position within the stream.
 		size_t pos;
-
-		/// Skip this many bytes before calculating a new chunk.
-		size_t pre;
 	}
 
 	private // configuration
@@ -197,10 +194,10 @@ struct Chunker(R)
 		this.hash.start();
 		this.hash.slide(1);
 		this.start = this.pos;
-		// do not start a new chunk unless at least minSize bytes have been read
-		this.pre = this.minSize - RabinHash.windowSize;
 		auto minSize = this.minSize;
 		auto maxSize = this.maxSize;
+		// do not start a new chunk unless at least minSize bytes have been read
+		auto pre = minSize - RabinHash.windowSize;
 
 		while (true)
 		{
@@ -236,19 +233,19 @@ struct Chunker(R)
 			auto bmax = this.buf.length;
 
 			// check if bytes have to be dismissed before starting a new chunk
-			if (this.pre > 0)
+			if (pre > 0)
 			{
 				auto n = bmax - this.bpos;
-				if (this.pre > n)
+				if (pre > n)
 				{
-					this.pre -= n;
+					pre -= n;
 					copyBytes(n);
 
 					continue;
 				}
 
-				copyBytes(this.pre);
-				this.pre = 0;
+				copyBytes(pre);
+				pre = 0;
 			}
 
 			auto add = this.count;
