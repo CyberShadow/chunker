@@ -101,28 +101,97 @@ public enum size_t maxSize = 8 * miB;
 private enum chunkerBufSize = 512 * kiB;
 
 
-private struct Tables
-{
-	private Pol[256] out_;
-	private Pol[256] mod;
-}
-
-// cache precomputed tables, these are read-only anyway
-private struct cache
-{
-static:
-	Tables[Pol] entries;
-	Object mutex;
-}
-
-static this()
-{
-	cache.mutex = new Object;
-}
-
 /// Calculates a streaming Rabin Fingerprint.
 private struct Hash
 {
+	// cache precomputed tables, these are read-only anyway
+	private struct Cache
+	{
+	static:
+		Tables[Pol] entries;
+		Object mutex;
+	}
+	static Cache cache;
+
+	static this()
+	{
+		cache.mutex = new Object;
+	}
+
+	private struct Tables
+	{
+		private Pol[256] out_;
+		private Pol[256] mod;
+	}
+
+	/// Precomputed tables used for hashing.
+	private Tables tables;
+	/// Whether `tables` have already been computed.
+	private bool tablesInitialized;
+
+	/// `fillTables` calculates `out_table` and `mod_table` for
+	/// optimization. This implementation uses a cache in the global
+	/// variable `cache`.
+	private void fillTables(Pol pol)
+	{
+		tablesInitialized = true;
+
+		// test if the tables are cached for this polynomial
+		synchronized(cache.mutex)
+		{
+			if (auto t = pol in cache.entries)
+			{
+				tables = *t;
+				return;
+			}
+
+			// calculate table for sliding out bytes. The byte to slide out is used as
+			// the index for the table, the value contains the following:
+			// out_table[b] = Hash(b || 0 ||        ...        || 0)
+			//                          \ windowsize-1 zero bytes /
+			// To slide out byte b_0 for window size w with known hash
+			// H := H(b_0 || ... || b_w), it is sufficient to add out_table[b_0]:
+			//    H(b_0 || ... || b_w) + H(b_0 || 0 || ... || 0)
+			//  = H(b_0 + b_0 || b_1 + 0 || ... || b_w + 0)
+			//  = H(    0     || b_1 || ...     || b_w)
+			//
+			// Afterwards a new byte can be shifted in.
+			foreach (b; 0 .. 256)
+			{
+				Pol h;
+
+				h = appendByte(h, cast(ubyte)b, pol);
+				foreach (i; 0 .. Hash.windowSize-1)
+					h = appendByte(h, 0, pol);
+				tables.out_[b] = h;
+			}
+
+			// calculate table for reduction mod Polynomial
+			auto k = pol.deg();
+			foreach (b; 0 .. 256)
+			{
+				// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
+				//
+				// The 8 bits above deg(Polynomial) determine what happens next and so
+				// these bits are used as a lookup to this table. The value is split in
+				// two parts: Part A contains the result of the modulus operation, part
+				// B is used to cancel out the 8 top bits so that one XOR operation is
+				// enough to reduce modulo Polynomial
+				tables.mod[b] = Pol(
+					(Pol(Pol.Base(b) << uint(k)) % pol).value |
+					    (Pol.Base(b) << uint(k)));
+			}
+
+			cache.entries[pol] = tables;
+		}
+	}
+
+	/// Bits to shift the digest when updating the hash.
+	/// Calculated from the polynomial's degree.
+	private uint polShift;
+
+	// ---------------------------------------------------------------------
+
 	alias Digest = ulong;
 
 	/// Size of the sliding window.
@@ -182,7 +251,6 @@ private struct Hash
 
 	private static Digest /*newDigest*/ updateDigest(Digest digest, uint polShift, in ref Pol[256] tabmod, ubyte b)
 	{
-		pragma(inline, true);
 		auto index = cast(ubyte)(digest >> polShift);
 		digest <<= 8;
 		digest |= Digest(b);
@@ -238,13 +306,6 @@ struct Chunker(R)
 		/// Minimum and maximum chunk sizes, as configured.
 		public size_t minSize, maxSize;
 
-		/// Bits to shift the digest when updating the hash.
-		/// Calculated from the polynomial's degree.
-		private uint polShift;
-		/// Precomputed tables used for hashing.
-		private Tables tables;
-		/// Whether `tables` have already been computed.
-		private bool tablesInitialized;
 		/// Hash mask used to decide chunk boundaries.
 		/// By default `(1 << 20) - 1`, or configured from `setAverageBits`.
 		private ulong splitmask;
@@ -278,8 +339,8 @@ struct Chunker(R)
 		config.minSize = min;
 		config.maxSize = max;
 		config.splitmask = (1 << 20) - 1; // aim to create chunks of 20 bits or about 1MiB on average.
-		config.polShift = uint(pol.deg() - 8);
-		fillTables(pol);
+		state.hash.polShift = uint(pol.deg() - 8);
+		state.hash.fillTables(pol);
 		reset();
 	}
 
@@ -295,63 +356,6 @@ struct Chunker(R)
 		state.pre = config.minSize - Hash.windowSize;
 	}
 
-	/// `fillTables` calculates `out_table` and `mod_table` for
-	/// optimization. This implementation uses a cache in the global
-	/// variable `cache`.
-	private void fillTables(Pol pol)
-	{
-		config.tablesInitialized = true;
-
-		// test if the tables are cached for this polynomial
-		synchronized(cache.mutex)
-		{
-			if (auto t = pol in cache.entries)
-			{
-				config.tables = *t;
-				return;
-			}
-
-			// calculate table for sliding out bytes. The byte to slide out is used as
-			// the index for the table, the value contains the following:
-			// out_table[b] = Hash(b || 0 ||        ...        || 0)
-			//                          \ windowsize-1 zero bytes /
-			// To slide out byte b_0 for window size w with known hash
-			// H := H(b_0 || ... || b_w), it is sufficient to add out_table[b_0]:
-			//    H(b_0 || ... || b_w) + H(b_0 || 0 || ... || 0)
-			//  = H(b_0 + b_0 || b_1 + 0 || ... || b_w + 0)
-			//  = H(    0     || b_1 || ...     || b_w)
-			//
-			// Afterwards a new byte can be shifted in.
-			foreach (b; 0 .. 256)
-			{
-				Pol h;
-
-				h = appendByte(h, cast(ubyte)b, pol);
-				foreach (i; 0 .. Hash.windowSize-1)
-					h = appendByte(h, 0, pol);
-				config.tables.out_[b] = h;
-			}
-
-			// calculate table for reduction mod Polynomial
-			auto k = pol.deg();
-			foreach (b; 0 .. 256)
-			{
-				// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
-				//
-				// The 8 bits above deg(Polynomial) determine what happens next and so
-				// these bits are used as a lookup to this table. The value is split in
-				// two parts: Part A contains the result of the modulus operation, part
-				// B is used to cancel out the 8 top bits so that one XOR operation is
-				// enough to reduce modulo Polynomial
-				config.tables.mod[b] = Pol(
-					(Pol(Pol.Base(b) << uint(k)) % pol).value |
-					    (Pol.Base(b) << uint(k)));
-			}
-
-			cache.entries[pol] = config.tables;
-		}
-	}
-
 	/// Returns the position and length of the next chunk of data.
 	/// If an exception occurs while reading, it is propagated.
 	/// Afterwards, the state of the current chunk is undefined.
@@ -360,12 +364,12 @@ struct Chunker(R)
 	public Chunk next(ubyte[] data)
 	{
 		data = data[0..0];
-		if (!config.tablesInitialized)
+		if (!state.hash.tablesInitialized)
 			throw new Exception("tables for polynomial computation not initialized");
 
-		auto tabout = &config.tables.out_;
-		auto tabmod = &config.tables.mod;
-		auto polShift = config.polShift;
+		auto tabout = &state.hash.tables.out_;
+		auto tabmod = &state.hash.tables.mod;
+		auto polShift = state.hash.polShift;
 		auto minSize = config.minSize;
 		auto maxSize = config.maxSize;
 		auto buf = state.buf;
@@ -464,7 +468,7 @@ struct Chunker(R)
 
 	private void slide(ubyte b)
 	{
-		Hash.slide(state.hash.window, state.hash.fastState.wpos, state.hash.fastState.digest, config.tables.out_, config.tables.mod, config.polShift, b);
+		Hash.slide(state.hash.window, state.hash.fastState.wpos, state.hash.fastState.digest, state.hash.tables.out_, state.hash.tables.mod, state.hash.polShift, b);
 	}
 }
 
