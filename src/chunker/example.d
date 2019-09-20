@@ -13,17 +13,17 @@ void main()
 	auto data = getRandom(23, 32*1024*1024);
 	File("temp.bin", "wb").rawWrite(data);
 
-	// create a chunker
-	auto chunker = File("temp.bin", "rb")
-		.byChunk(512 * 1024)
-		.byCDChunk(Pol(0x3DA3358B4DC173));
-
 	// reuse this buffer
 	auto buf = new ubyte[8*1024*1024];
 
+	// create a chunker
+	auto chunker = File("temp.bin", "rb")
+		.byChunk(512 * 1024)
+		.byCDChunk(Pol(0x3DA3358B4DC173), buf);
+
 	foreach (i; 0 .. 5)
 	{
-		auto chunk = chunker.next(buf);
+		auto chunk = chunker.next();
 		if (chunk is typeof(chunk).init)
 			break;
 

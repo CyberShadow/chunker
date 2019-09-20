@@ -125,6 +125,8 @@ struct Chunker(R)
 		/// Current hash internal state.
 		private RabinHash hash;
 
+		/// Buffer used to copy chunk data to.
+		private ubyte[] cbuf;
 		/// Buffer used to receive and keep read data in.
 		private ubyte[] buf;
 		/// Current read position within `buf`.
@@ -170,10 +172,11 @@ struct Chunker(R)
 
 	/// Constructs a new `Chunker` based on polynomial `pol` that
 	/// reads from `rd`.
-	public this(R rd, Pol pol, size_t min = minSize, size_t max = maxSize)
+	public this(R rd, Pol pol, size_t min = minSize, size_t max = maxSize, ubyte[] cbuf = null)
 	{
 		state = State();
 		state.buf = rd.empty ? null : rd.front;
+		state.cbuf = cbuf ? cbuf : new ubyte[maxSize];
 		config = Config();
 		config.rd = rd;
 		config.minSize = min;
@@ -195,15 +198,24 @@ struct Chunker(R)
 		state.pre = config.minSize - RabinHash.windowSize;
 	}
 
+	private void copyBytes(size_t numBytes)
+	{
+		auto bytes = state.buf[state.bpos .. state.bpos + numBytes];
+		state.bpos += numBytes;
+		auto newLen = state.count + bytes.length;
+		if (state.cbuf.length < newLen)
+			state.cbuf.length = newLen;
+		state.cbuf[state.count .. newLen] = bytes[];
+		state.pos += numBytes;
+	}
+
 	/// Returns the position and length of the next chunk of data.
 	/// If an exception occurs while reading, it is propagated.
 	/// Afterwards, the state of the current chunk is undefined.
 	/// When the last chunk has been returned, all subsequent calls
 	/// return `Chunk.init`.
-	public Chunk next(ubyte[] data)
+	public Chunk next()
 	{
-		data = data[0..0];
-
 		auto minSize = config.minSize;
 		auto maxSize = config.maxSize;
 		while (true)
@@ -228,7 +240,7 @@ struct Chunker(R)
 							/*Start: */ state.start,
 							/*Length:*/ state.count,
 							/*Cut:   */ state.hash.peek,
-							/*Data:  */ data,
+							/*Data:  */ state.cbuf[0 .. state.count],
 						);
 				}
 
@@ -246,18 +258,12 @@ struct Chunker(R)
 				if (state.pre > n)
 				{
 					state.pre -= n;
-					data ~= state.buf[state.bpos .. bmax];
-
-					state.pos += n;
-					state.bpos = bmax;
+					copyBytes(n);
 
 					continue;
 				}
 
-				data ~= state.buf[state.bpos .. state.bpos+state.pre];
-
-				state.bpos += state.pre;
-				state.pos += state.pre;
+				copyBytes(state.pre);
 				state.pre = 0;
 			}
 
@@ -281,16 +287,14 @@ struct Chunker(R)
 			if (bpos + written != bmax)
 			{
 				auto i = add - state.count;
-				data ~= state.buf[state.bpos .. state.bpos+i];
-				state.pos += i;
-				state.bpos += i;
+				copyBytes(i);
 
 				auto chunk = Chunk
 				(
 					/*Start: */ state.start,
 					/*Length:*/ state.count,
 					/*Cut:   */ state.hash.peek(),
-					/*Data:  */ data,
+					/*Data:  */ state.cbuf[0 .. state.count],
 				);
 
 				reset();
@@ -299,17 +303,19 @@ struct Chunker(R)
 			}
 
 			auto steps = bmax - state.bpos;
-			if (steps > 0)
-				data ~= state.buf[state.bpos .. state.bpos+steps];
-			state.pos += steps;
-			state.bpos = bmax;
+			copyBytes(steps);
 		}
 	}
 }
 
-Chunker!R byCDChunk(R)(R rd, Pol pol, size_t min = minSize, size_t max = maxSize)
+Chunker!R byCDChunk(R)(R rd, Pol pol, size_t min = minSize, size_t max = maxSize, ubyte[] cbuf = null)
 {
-	return Chunker!R(rd, pol, min, max);
+	return Chunker!R(rd, pol, min, max, cbuf);
+}
+
+Chunker!R byCDChunk(R)(R rd, Pol pol, ubyte[] cbuf)
+{
+	return Chunker!R(rd, pol, minSize, maxSize, cbuf);
 }
 
 // -----------------------------------------------------------------------------
@@ -452,14 +458,14 @@ TestChunk[] chunks4 =
 import std.format : format;
 import std.digest.sha : sha256Of;
 
-private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] testChunks, bool checkDigest)
+private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] testChunks, bool checkDigest, bool copyData = false)
 {
 	Chunker!R.Chunk[] chunks;
 
 	size_t pos = 0;
 	foreach (i, chunk; testChunks)
 	{
-		auto c = chnker.next(null);
+		auto c = chnker.next();
 
 		assert(c.start == pos,
 			format!"Start for chunk %d does not match: expected %d, got %d"
@@ -482,10 +488,12 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 		}
 
 		pos += c.length;
+		if (copyData)
+			c.data = c.data.dup;
 		chunks ~= c;
 	}
 
-	auto c = chnker.next(null);
+	auto c = chnker.next();
 	if (c !is typeof(c).init)
 		assert(false, "Wrong error returned after last chunk");
 
@@ -572,7 +580,7 @@ import std.range : chunks;
 	ch.setAverageBits(7);
 
 	size_t[] sizes;
-	for (auto chunk = ch.next(null); chunk !is typeof(chunk).init; chunk = ch.next(null))
+	for (auto chunk = ch.next(); chunk !is typeof(chunk).init; chunk = ch.next())
 		if (chunk.length != RabinHash.windowSize * 2 + 2)
 			sizes ~= chunk.length;
 
@@ -599,7 +607,7 @@ import std.stdio : stderr;
 	stderr.writefln!"creating chunker took %s"(Clock.currTime() - start);
 
 	// make sure that first chunk is different
-	auto c = ch.next(null);
+	auto c = ch.next();
 
 	assert(c.cut != chunks1[0].cutFP,
 		"Cut point is the same");
@@ -617,7 +625,7 @@ import std.stdio : stderr;
 	auto data = getRandom(23, 32*1024*1024);
 
 	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol);
-	auto chunks = testWithData(ch, chunks1, false);
+	auto chunks = testWithData(ch, chunks1, false, true);
 
 	// test reader
 	foreach (i, c; chunks)
@@ -655,12 +663,12 @@ version (benchmarkChunker)
 		Benchmark.benchmark({
 			chunks = 0;
 
-			auto ch = data.byCDChunk(testPol);
+			auto ch = data.byCDChunk(testPol, buf);
 
 			auto cur = 0;
 			while (true)
 			{
-				auto chunk = ch.next(buf);
+				auto chunk = ch.next();
 
 				if (chunk is typeof(chunk).init)
 				{
