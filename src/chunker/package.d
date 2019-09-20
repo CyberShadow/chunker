@@ -168,7 +168,7 @@ private struct Hash
 		return result;
 	}
 
-	private static void slide(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, ref Pol[256] tabmod, uint polShift, ubyte b)
+	private static void slide(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, in ref Pol[256] tabmod, uint polShift, ubyte b)
 	{
 		auto out_ = window[wpos];
 		window[wpos] = b;
@@ -180,7 +180,7 @@ private struct Hash
 		digest = updateDigest(digest, polShift, tabmod, b);
 	}
 
-	private static Digest /*newDigest*/ updateDigest(Digest digest, uint polShift, ref Pol[256] tabmod, ubyte b)
+	private static Digest /*newDigest*/ updateDigest(Digest digest, uint polShift, in ref Pol[256] tabmod, ubyte b)
 	{
 		pragma(inline, true);
 		auto index = cast(ubyte)(digest >> polShift);
@@ -238,8 +238,6 @@ struct Chunker(R)
 		/// Minimum and maximum chunk sizes, as configured.
 		public size_t minSize, maxSize;
 
-		/// Polynomial to use when calculating the hash.
-		private Pol pol;
 		/// Bits to shift the digest when updating the hash.
 		/// Calculated from the polynomial's degree.
 		private uint polShift;
@@ -280,35 +278,20 @@ struct Chunker(R)
 	/// reads from `rd` and custom `min` and `max` size boundaries.
 	public this(R rd, Pol pol, size_t min, size_t max)
 	{
-		resetWithBoundaries(rd, pol, min, max);
-	}
-
-	/// Reinitializes the `Chunker` with a new reader and polynomial.
-	public void reset(R rd, Pol pol)
-	{
-		resetWithBoundaries(rd, pol, minSize, maxSize);
-	}
-
-	/// Reinitializes the `Chunker` with a new reader, polynomial and
-	/// custom min and max size boundaries.
-	public void resetWithBoundaries(R rd, Pol pol, size_t min, size_t max)
-	{
 		state = State();
 		state.buf = new ubyte[chunkerBufSize];
 		config = Config();
-		config.pol = pol;
 		config.rd = rd;
 		config.minSize = min;
 		config.maxSize = max;
 		config.splitmask = (1 << 20) - 1; // aim to create chunks of 20 bits or about 1MiB on average.
+		config.polShift = uint(pol.deg() - 8);
+		fillTables(pol);
 		reset();
 	}
 
 	private void reset()
 	{
-		config.polShift = uint(config.pol.deg() - 8);
-		fillTables();
-
 		state.hash.start();
 
 		config.closed = false;
@@ -322,18 +305,14 @@ struct Chunker(R)
 	/// `fillTables` calculates `out_table` and `mod_table` for
 	/// optimization. This implementation uses a cache in the global
 	/// variable `cache`.
-	private void fillTables()
+	private void fillTables(Pol pol)
 	{
-		// if polynomial hasn't been specified, do not compute anything for now
-		if (config.pol.value == 0)
-			return;
-
 		config.tablesInitialized = true;
 
 		// test if the tables are cached for this polynomial
 		synchronized(cache.mutex)
 		{
-			if (auto t = config.pol in cache.entries)
+			if (auto t = pol in cache.entries)
 			{
 				config.tables = *t;
 				return;
@@ -354,14 +333,14 @@ struct Chunker(R)
 			{
 				Pol h;
 
-				h = appendByte(h, cast(ubyte)b, config.pol);
+				h = appendByte(h, cast(ubyte)b, pol);
 				foreach (i; 0 .. Hash.windowSize-1)
-					h = appendByte(h, 0, config.pol);
+					h = appendByte(h, 0, pol);
 				config.tables.out_[b] = h;
 			}
 
 			// calculate table for reduction mod Polynomial
-			auto k = config.pol.deg();
+			auto k = pol.deg();
 			foreach (b; 0 .. 256)
 			{
 				// mod_table[b] = A | B, where A = (b(x) * x^k mod pol) and  B = b(x) * x^k
@@ -372,11 +351,11 @@ struct Chunker(R)
 				// B is used to cancel out the 8 top bits so that one XOR operation is
 				// enough to reduce modulo Polynomial
 				config.tables.mod[b] = Pol(
-					(Pol(Pol.Base(b) << uint(k)) % config.pol).value |
+					(Pol(Pol.Base(b) << uint(k)) % pol).value |
 					    (Pol.Base(b) << uint(k)));
 			}
 
-			cache.entries[config.pol] = config.tables;
+			cache.entries[pol] = config.tables;
 		}
 	}
 
@@ -713,16 +692,6 @@ import std.array : replicate;
 	testWithData(ch, chunks3, true);
 }
 
-@(`ChunkerReset`) unittest
-{
-	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = Chunker!File(bufFile(buf), testPol);
-	testWithData(ch, chunks1, true);
-
-	ch.reset(bufFile(buf), testPol);
-	testWithData(ch, chunks1, true);
-}
-
 import std.stdio : stderr;
 
 @(`ChunkerWithRandomPolynomial`) unittest
@@ -789,7 +758,7 @@ version (benchmarkChunker)
 	{
 		auto size = 32 * 1024 * 1024;
 		auto rd = bufFile(getRandom(23, size));
-		auto ch = Chunker!File(rd, testPol);
+		Chunker!File ch;
 		auto buf = new ubyte[maxSize];
 
 		// b.SetBytes(long(size));
@@ -800,7 +769,7 @@ version (benchmarkChunker)
 
 			rd.seek(0);
 
-			ch.reset(rd, testPol);
+			ch = Chunker!File(rd, testPol);
 
 			auto cur = 0;
 			while (true)
