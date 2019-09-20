@@ -262,14 +262,18 @@ struct Chunker(R)
 
 			auto add = state.count;
 			auto hashWriter = state.hash.getWriter();
-			foreach (_, b; buf[state.bpos .. state.bmax])
+			auto bpos = state.bpos;
+			foreach (_, b; buf[bpos .. state.bmax])
 			{
+				if (add >= minSize)
+					break;
+
 				hashWriter.slide(b);
-
 				add++;
-				if (add < minSize)
-					continue;
-
+				bpos++;
+			}
+			foreach (_, b; buf[bpos .. state.bmax])
+			{
 				if ((hashWriter.peek()&config.splitmask) == 0 || add >= maxSize)
 				{
 					auto i = add - state.count;
@@ -290,6 +294,10 @@ struct Chunker(R)
 
 					return chunk;
 				}
+
+				hashWriter.slide(b);
+				add++;
+
 			}
 			state.hash.commit(hashWriter);
 
