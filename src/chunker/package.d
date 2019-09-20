@@ -498,25 +498,55 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 }
 
 import std.array : replicate;
+import std.range : chunks;
 
 @(`Chunker`) unittest
 {
 	// setup data source
 	auto data = getRandom(23, 32*1024*1024);
-	auto ch = [data].byCDChunk(testPol);
+	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol);
 	testWithData(ch, chunks1, true);
 
 	// setup nullbyte data source
 	data = replicate([ubyte(0)], chunks2.length*minSize);
-	ch = [data].byCDChunk(testPol);
+	ch = data.chunks(chunkerBufSize).byCDChunk(testPol);
 
+	testWithData(ch, chunks2, true);
+}
+
+@(`ChunkerWithArrayInput`) unittest
+{
+	// Test with all data in one array/chunk
+	auto data = getRandom(23, 32*1024*1024);
+	auto ch = [data].byCDChunk(testPol);
+	testWithData(ch, chunks1, true);
+
+	data = replicate([ubyte(0)], chunks2.length*minSize);
+	ch = [data].byCDChunk(testPol);
+	testWithData(ch, chunks2, true);
+}
+
+@(`ChunkerWithFileInput`) unittest
+{
+	// Test with File.byChunk
+	import std.stdio : File;
+	import std.file : remove;
+	auto data = getRandom(23, 32*1024*1024);
+	File("test.bin", "wb").rawWrite(data);
+	scope(exit) remove("test.bin");
+	auto ch = File("test.bin", "rb").byChunk(chunkerBufSize).byCDChunk(testPol);
+	testWithData(ch, chunks1, true);
+
+	data = replicate([ubyte(0)], chunks2.length*minSize);
+	File("test.bin", "wb").rawWrite(data);
+	ch = File("test.bin", "rb").byChunk(chunkerBufSize).byCDChunk(testPol);
 	testWithData(ch, chunks2, true);
 }
 
 @(`ChunkerWithCustomAverageBits`) unittest
 {
 	auto data = getRandom(23, 32*1024*1024);
-	auto ch = [data].byCDChunk(testPol);
+	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol);
 
 	// sligthly decrease averageBits to get more chunks
 	ch.setAverageBits(19);
@@ -526,7 +556,7 @@ import std.array : replicate;
 @(`ChunkerWithCustomMinMax`) unittest
 {
 	auto data = getRandom(23, 32*1024*1024);
-	auto ch = [data].byCDChunk(testPol,
+	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol,
 		(1 << 20) - (1 << 18),
 		(1 << 20) + (1 << 18));
 
@@ -538,7 +568,7 @@ import std.array : replicate;
 @(`ChunkerMinMaxBounds`) unittest
 {
 	auto data = getRandom(23, 64*1024);
-	auto ch = [data].byCDChunk(testPol,
+	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol,
 		RabinHash.windowSize * 2 - 2,
 		RabinHash.windowSize * 2 + 2);
 	ch.setAverageBits(7);
@@ -567,7 +597,7 @@ import std.stdio : stderr;
 	stderr.writefln!"generating random polynomial took %s"(Clock.currTime() - start);
 
 	start = Clock.currTime();
-	auto ch = [data].byCDChunk(p);
+	auto ch = data.chunks(chunkerBufSize).byCDChunk(p);
 	stderr.writefln!"creating chunker took %s"(Clock.currTime() - start);
 
 	// make sure that first chunk is different
@@ -588,7 +618,7 @@ import std.stdio : stderr;
 	// setup data source
 	auto data = getRandom(23, 32*1024*1024);
 
-	auto ch = [data].byCDChunk(testPol);
+	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol);
 	auto chunks = testWithData(ch, chunks1, false);
 
 	// test reader
@@ -605,7 +635,7 @@ import std.stdio : stderr;
 
 	// setup nullbyte data source
 	data = replicate([ubyte(0)], chunks2.length*minSize);
-	ch = [data].byCDChunk(testPol);
+	ch = data.chunks(chunkerBufSize).byCDChunk(testPol);
 
 	testWithData(ch, chunks2, false);
 }
