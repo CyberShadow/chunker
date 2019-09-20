@@ -97,6 +97,8 @@ import std.range.primitives : empty, front, popFront;
 private enum size_t kiB = 1024;
 private enum size_t miB = 1024 * kiB;
 
+/// Aim to create chunks of 20 bits or about 1MiB on average.
+public enum size_t averageBits = 20;
 /// Default minimal size of a chunk.
 public enum size_t minSize = 512 * kiB;
 /// Default maximal size of a chunk.
@@ -147,7 +149,7 @@ struct Chunker(R)
 		public size_t minSize, maxSize;
 
 		/// Hash mask used to decide chunk boundaries.
-		/// By default `(1 << 20) - 1`, or configured from `setAverageBits`.
+		/// By default `(1 << 20) - 1`, or configured from `averageBits`.
 		private ulong splitmask;
 
 		/// Input data source.
@@ -159,18 +161,7 @@ struct Chunker(R)
 	Config config;
 	State state;
 
-	/// Allows to control the frequency of chunk discovery: the lower
-	/// `averageBits`, the higher amount of chunks will be identified.
-	/// The default value is 20 bits, so chunks will be of 1MiB size
-	/// on average.
-	public void setAverageBits(uint averageBits)
-	{
-		config.splitmask = (1L << averageBits) - 1;
-	}
-
-	/// Constructs a new `Chunker` based on polynomial `pol` that
-	/// reads from `rd`.
-	public this(R rd, Pol pol, size_t min = minSize, size_t max = maxSize, ubyte[] cbuf = null)
+	public this(R rd, Pol pol, uint averageBits, size_t min, size_t max, ubyte[] cbuf)
 	{
 		state = State();
 		state.buf = rd.empty ? null : rd.front;
@@ -179,7 +170,7 @@ struct Chunker(R)
 		config.rd = rd;
 		config.minSize = min;
 		config.maxSize = max;
-		config.splitmask = (1 << 20) - 1; // aim to create chunks of 20 bits or about 1MiB on average.
+		config.splitmask = (1L << averageBits) - 1;
 		state.hash = RabinHash(pol);
 		reset();
 	}
@@ -304,14 +295,22 @@ struct Chunker(R)
 	}
 }
 
-Chunker!R byCDChunk(R)(R rd, Pol pol, size_t min = minSize, size_t max = maxSize, ubyte[] cbuf = null)
+/// Constructs a new `Chunker` based on polynomial `pol` that
+/// reads from `rd`.
+/// Params:
+///   averageBits = Allows to control the frequency of chunk
+///     discovery: the lower `averageBits`, the higher amount of
+///     chunks will be identified.  The default value is 20 bits,
+///     so chunks will be of 1MiB size on average.
+Chunker!R byCDChunk(R)(R rd, Pol pol, uint averageBits = .averageBits, size_t min = minSize, size_t max = maxSize, ubyte[] cbuf = null)
 {
-	return Chunker!R(rd, pol, min, max, cbuf);
+	return Chunker!R(rd, pol, averageBits, min, max, cbuf);
 }
 
+/// ditto
 Chunker!R byCDChunk(R)(R rd, Pol pol, ubyte[] cbuf)
 {
-	return Chunker!R(rd, pol, minSize, maxSize, cbuf);
+	return Chunker!R(rd, pol, .averageBits, minSize, maxSize, cbuf);
 }
 
 // -----------------------------------------------------------------------------
@@ -548,10 +547,10 @@ import std.range : chunks;
 @(`ChunkerWithCustomAverageBits`) unittest
 {
 	auto data = getRandom(23, 32*1024*1024);
-	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol);
 
 	// sligthly decrease averageBits to get more chunks
-	ch.setAverageBits(19);
+	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol, 19);
+
 	testWithData(ch, chunks3, true);
 }
 
@@ -559,6 +558,7 @@ import std.range : chunks;
 {
 	auto data = getRandom(23, 32*1024*1024);
 	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol,
+		20,
 		(1 << 20) - (1 << 18),
 		(1 << 20) + (1 << 18));
 
@@ -571,9 +571,9 @@ import std.range : chunks;
 {
 	auto data = getRandom(23, 64*1024);
 	auto ch = data.chunks(chunkerBufSize).byCDChunk(testPol,
+		7,
 		RabinHash.windowSize * 2 - 2,
 		RabinHash.windowSize * 2 + 2);
-	ch.setAverageBits(7);
 
 	size_t[] sizes;
 	for (auto chunk = ch.next(); chunk !is typeof(chunk).init; chunk = ch.next())
