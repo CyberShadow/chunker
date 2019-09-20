@@ -193,6 +193,17 @@ struct RabinHash
 		slideImpl(window, scalars.wpos, scalars.digest, tables.out_, tables.mod, polShift, b);
 	}
 
+	/// Slide in all `bytes`.
+	/// Note that using more bytes than `windowSize` is ineffectual,
+	/// and only the last `windowSize` bytes affect the final digest.
+	void put(R)(R bytes)
+	{
+		auto writer = getWriter();
+		scope(success) commit(writer);
+		foreach (b; bytes)
+			writer.slide(b);
+	}
+
 	/// Implementation for `slide`.
 	private static void slideImpl(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, in ref Pol[256] tabmod, uint polShift, ubyte b)
 	{
