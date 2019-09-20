@@ -154,38 +154,32 @@ struct Chunker(R)
 
 		/// Input data source.
 		private R rd;
-		/// Whether we've read all data from the source.
-		private bool closed;
 	}
 
-	Config config;
-	State state;
+	private Config config;
+	private State state;
 
+	/// Probably use the `byCDChunk` convenience function instead of this constructor directly.
+	/// Note that `Chunker` will `popFront` the input range during construction.
 	public this(R rd, Pol pol, uint averageBits, size_t min, size_t max, ubyte[] cbuf)
 	{
-		state = State();
-		state.buf = rd.empty ? null : rd.front;
-		state.cbuf = cbuf ? cbuf : new ubyte[maxSize];
-		config = Config();
+		state.cbuf = cbuf ? cbuf : new ubyte[max];
 		config.rd = rd;
 		config.minSize = min;
 		config.maxSize = max;
 		config.splitmask = (1L << averageBits) - 1;
 		state.hash = RabinHash(pol);
-		reset();
+		if (config.rd.empty)
+			empty = true;
+		else
+		{
+			state.buf = config.rd.front;
+			popFront();
+		}
 	}
 
-	private void reset()
-	{
-		state.hash.start();
-
-		config.closed = false;
-		state.hash.slide(1);
-		state.start = state.pos;
-
-		// do not start a new chunk unless at least minSize bytes have been read
-		state.pre = config.minSize - RabinHash.windowSize;
-	}
+	Chunk front; /// Current chunk.
+	bool empty; /// `true` when there are no more chunks (input range is empty).
 
 	private void copyBytes(size_t numBytes)
 	{
@@ -198,42 +192,47 @@ struct Chunker(R)
 		state.pos += numBytes;
 	}
 
-	/// Returns the position and length of the next chunk of data.
-	/// If an exception occurs while reading, it is propagated.
-	/// Afterwards, the state of the current chunk is undefined.
-	/// When the last chunk has been returned, all subsequent calls
-	/// return `Chunk.init`.
-	public Chunk next()
+	/// Updates `front` to contain the position and data of the next
+	/// chunk. Note that `Chunker` reuses the chunk buffer, so the
+	/// previous contents of `front.data` will be overwritten.
+	public void popFront()
 	{
+		assert(!empty);
+
+		state.hash.start();
+		state.hash.slide(1);
+		state.start = state.pos;
+		// do not start a new chunk unless at least minSize bytes have been read
+		state.pre = config.minSize - RabinHash.windowSize;
 		auto minSize = config.minSize;
 		auto maxSize = config.maxSize;
+
 		while (true)
 		{
 			if (state.bpos >= state.buf.length)
 			{
 				if (config.rd.empty)
-					return Chunk.init;
+				{
+					// Last chunk has been read.
+					empty = true;
+					return;
+				}
 
 				config.rd.popFront();
 
-				// There are no more bytes to buffer, so this was the last
-				// chunk.
-				if (config.rd.empty && !config.closed)
+				if (config.rd.empty)
 				{
-					config.closed = true;
-
-					// return current chunk, if any bytes have been processed
+					// There are no more bytes to buffer, so this was
+					// the last chunk. Return current chunk, if any
+					// bytes have been processed.
 					if (state.count > 0)
-						return Chunk
-						(
-							/*Start: */ state.start,
-							/*Cut:   */ state.hash.peek,
-							/*Data:  */ state.cbuf[0 .. state.count],
-						);
+						front = Chunk(state.start, state.hash.peek, state.cbuf[0 .. state.count]);
+					else
+						empty = true;
+					return;
 				}
 
 				state.buf = config.rd.front;
-
 				state.bpos = 0;
 			}
 
@@ -277,16 +276,8 @@ struct Chunker(R)
 				auto i = add - state.count;
 				copyBytes(i);
 
-				auto chunk = Chunk
-				(
-					/*Start: */ state.start,
-					/*Cut:   */ state.hash.peek(),
-					/*Data:  */ state.cbuf[0 .. state.count],
-				);
-
-				reset();
-
-				return chunk;
+				front = Chunk(state.start, state.hash.peek(), state.cbuf[0 .. state.count]);
+				return;
 			}
 
 			auto steps = bmax - state.bpos;
@@ -460,7 +451,7 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 	size_t pos = 0;
 	foreach (i, chunk; testChunks)
 	{
-		auto c = chnker.next();
+		auto c = chnker.front;
 
 		assert(c.start == pos,
 			format!"Start for chunk %d does not match: expected %d, got %d"
@@ -486,10 +477,10 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 		if (copyData)
 			c.data = c.data.dup;
 		chunks ~= c;
+		chnker.popFront();
 	}
 
-	auto c = chnker.next();
-	if (c !is typeof(c).init)
+	if (!chnker.empty)
 		assert(false, "Wrong error returned after last chunk");
 
 	assert(chunks.length == testChunks.length,
@@ -576,7 +567,7 @@ import std.range : chunks;
 		RabinHash.windowSize * 2 + 2);
 
 	size_t[] sizes;
-	for (auto chunk = ch.next(); chunk !is typeof(chunk).init; chunk = ch.next())
+	foreach (chunk; ch)
 		if (chunk.data.length != RabinHash.windowSize * 2 + 2)
 			sizes ~= chunk.data.length;
 
@@ -603,7 +594,7 @@ import std.stdio : stderr;
 	stderr.writefln!"creating chunker took %s"(Clock.currTime() - start);
 
 	// make sure that first chunk is different
-	auto c = ch.next();
+	auto c = ch.front;
 
 	assert(c.cut != chunks1[0].cutFP,
 		"Cut point is the same");
@@ -662,14 +653,9 @@ version (benchmarkChunker)
 			auto ch = data.byCDChunk(testPol, buf);
 
 			auto cur = 0;
-			while (true)
+			while (!ch.empty)
 			{
-				auto chunk = ch.next();
-
-				if (chunk is typeof(chunk).init)
-				{
-					break;
-				}
+				auto chunk = ch.front;
 
 				assert(chunk.data.length == chunks1[cur].length,
 					format!"wrong chunk length, want %d, got %d"
@@ -689,6 +675,7 @@ version (benchmarkChunker)
 
 				chunks++;
 				cur++;
+				ch.popFront();
 			}
 		});
 

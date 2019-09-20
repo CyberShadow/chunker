@@ -23,11 +23,12 @@ void main()
 
 	foreach (i; 0 .. 5)
 	{
-		auto chunk = chunker.next();
-		if (chunk is typeof(chunk).init)
+		if (chunker.empty)
 			break;
+		auto chunk = chunker.front;
 
 		writefln!"%d %(%02x%)"(chunk.data.length, sha256Of(chunk.data));
+		chunker.popFront();
 	}
 
 	// Output:
