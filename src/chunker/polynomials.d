@@ -1,6 +1,6 @@
 module chunker.polynomials;
 
-/// Pol is a polynomial from `F_2[X]`.
+/// Represents a polynomial from `F_2[X]`.
 struct Pol
 {
 	alias Base = ulong;

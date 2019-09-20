@@ -2,7 +2,7 @@ module chunker.rabin;
 
 import chunker.polynomials;
 
-/// Calculates a streaming Rabin Fingerprint.
+/// Calculates a rolling Rabin Fingerprint.
 struct RabinHash
 {
 	// cache precomputed tables, these are read-only anyway
@@ -12,7 +12,7 @@ struct RabinHash
 		Tables[Pol] entries;
 		Object mutex;
 	}
-	static Cache cache;
+	private static Cache cache;
 
 	static this()
 	{
@@ -153,7 +153,7 @@ struct RabinHash
 	// ---------------------------------------------------------------------
 
 	/// Type for fast writing of successive bytes.
-	/// Must contain only scalar values, so that optimizing compilers
+	/// Contains only scalar values, so that optimizing compilers
 	/// may break it up and place the fields in registers.
 	struct Writer
 	{
@@ -165,7 +165,7 @@ struct RabinHash
 		/// Return current digest.
 		public @property Digest peek() const { return scalars.digest; }
 
-		/// Update the hash with one byte.
+		/// Slide in one byte (and slide out the corresponding byte from the sliding window).
 		public void slide(ubyte b)
 		{
 			slideImpl(hash.window, scalars.wpos, scalars.digest, hash.tables.out_, hash.tables.mod, hash.polShift, b);
@@ -187,7 +187,7 @@ struct RabinHash
 		this.scalars = writer.scalars;
 	}
 
-	/// Update the hash with one byte.
+	/// Slide in one byte (and slide out the corresponding byte from the sliding window).
 	public void slide(ubyte b)
 	{
 		slideImpl(window, scalars.wpos, scalars.digest, tables.out_, tables.mod, polShift, b);
