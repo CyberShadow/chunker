@@ -5,6 +5,50 @@ import chunker.polynomials;
 /// Calculates a rolling Rabin Fingerprint.
 struct RabinHash
 {
+	/// Base type for the calculated digest.
+	alias Digest = ulong;
+
+	/// Size of the sliding window.
+	public enum size_t windowSize = 64;
+
+	/// Current contents of the sliding window.
+	private ubyte[windowSize] window;
+
+	/// Contains frequently-accessed scalar values.
+	/// See Writer for details.
+	private struct Scalars
+	{
+		/// Sliding window cursor.
+		private size_t wpos;
+
+		/// Current hash digest value.
+		private Digest digest;
+	}
+	/// ditto
+	private Scalars scalars;
+
+	/// Reset internal state.
+	void start()
+	{
+		foreach (i; 0 .. windowSize)
+			window[i] = 0;
+		scalars.digest = 0;
+		scalars.wpos = 0;
+	}
+
+	/// Return current digest.
+	@property Digest peek() const { return scalars.digest; }
+
+	/// Return current digest, then reset.
+	Digest finish()
+	{
+		auto result = scalars.digest;
+		start();
+		return result;
+	}
+
+	// ---------------------------------------------------------------------
+
 	// cache precomputed tables, these are read-only anyway
 	private struct Cache
 	{
@@ -97,50 +141,6 @@ struct RabinHash
 	{
 		polShift = uint(pol.deg() - 8);
 		fillTables(pol);
-	}
-
-	// ---------------------------------------------------------------------
-
-	/// Base type for the calculated digest.
-	alias Digest = ulong;
-
-	/// Size of the sliding window.
-	public enum size_t windowSize = 64;
-
-	/// Current contents of the sliding window.
-	private ubyte[windowSize] window;
-
-	/// Contains frequently-accessed scalar values.
-	/// See Writer for details.
-	private struct Scalars
-	{
-		/// Sliding window cursor.
-		private size_t wpos;
-
-		/// Current hash digest value.
-		private Digest digest;
-	}
-	/// ditto
-	private Scalars scalars;
-
-	/// Reset internal state.
-	void start()
-	{
-		foreach (i; 0 .. windowSize)
-			window[i] = 0;
-		scalars.digest = 0;
-		scalars.wpos = 0;
-	}
-
-	/// Return current digest.
-	@property Digest peek() const { return scalars.digest; }
-
-	/// Return current digest, then reset.
-	Digest finish()
-	{
-		auto result = scalars.digest;
-		start();
-		return result;
 	}
 
 	// ---------------------------------------------------------------------
