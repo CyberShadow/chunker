@@ -261,17 +261,18 @@ struct Chunker(R)
 			}
 
 			auto add = state.count;
-			auto hashWriter = state.hash.getWriter();
 			auto bpos = state.bpos;
-			foreach (_, b; buf[bpos .. state.bmax])
+			if (add < minSize)
 			{
-				if (add >= minSize)
-					break;
-
-				hashWriter.slide(b);
-				add++;
-				bpos++;
+				auto warmUp = minSize - add;
+				if (warmUp > state.bmax - bpos)
+					warmUp = state.bmax - bpos;
+				state.hash.put(buf[bpos .. bpos + warmUp]);
+				add += warmUp;
+				bpos += warmUp;
 			}
+
+			auto hashWriter = state.hash.getWriter();
 			foreach (_, b; buf[bpos .. state.bmax])
 			{
 				if ((hashWriter.peek()&config.splitmask) == 0 || add >= maxSize)
