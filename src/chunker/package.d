@@ -206,7 +206,6 @@ struct Chunker(R)
 
 		auto minSize = config.minSize;
 		auto maxSize = config.maxSize;
-		auto buf = state.buf;
 		while (true)
 		{
 			if (state.bpos >= state.buf.length)
@@ -233,7 +232,7 @@ struct Chunker(R)
 						);
 				}
 
-				buf = state.buf = config.rd.front;
+				state.buf = config.rd.front;
 
 				state.bpos = 0;
 			}
@@ -247,7 +246,7 @@ struct Chunker(R)
 				if (state.pre > n)
 				{
 					state.pre -= n;
-					data ~= buf[state.bpos .. bmax];
+					data ~= state.buf[state.bpos .. bmax];
 
 					state.pos += n;
 					state.bpos = bmax;
@@ -255,7 +254,7 @@ struct Chunker(R)
 					continue;
 				}
 
-				data ~= buf[state.bpos .. state.bpos+state.pre];
+				data ~= state.buf[state.bpos .. state.bpos+state.pre];
 
 				state.bpos += state.pre;
 				state.pos += state.pre;
@@ -269,7 +268,7 @@ struct Chunker(R)
 				auto warmUp = minSize - add;
 				if (warmUp > bmax - bpos)
 					warmUp = bmax - bpos;
-				state.hash.put(buf[bpos .. bpos + warmUp]);
+				state.hash.put(state.buf[bpos .. bpos + warmUp]);
 				add += warmUp;
 				bpos += warmUp;
 			}
@@ -277,7 +276,7 @@ struct Chunker(R)
 			auto toWrite = bmax - bpos;
 			if (add + toWrite > maxSize)
 				toWrite = maxSize - add;
-			auto written = state.hash.putUntil(buf[bpos .. bpos + toWrite], config.splitmask);
+			auto written = state.hash.putUntil(state.buf[bpos .. bpos + toWrite], config.splitmask);
 			add += written;
 			if (bpos + written != bmax)
 			{
@@ -285,7 +284,6 @@ struct Chunker(R)
 				data ~= state.buf[state.bpos .. state.bpos+i];
 				state.pos += i;
 				state.bpos += i;
-				state.buf = buf;
 
 				auto chunk = Chunk
 				(
