@@ -93,9 +93,6 @@ import chunker.polynomials;
 private enum size_t kiB = 1024;
 private enum size_t miB = 1024 * kiB;
 
-/// Size of the sliding window.
-private enum size_t windowSize = 64;
-
 /// Default minimal size of a chunk.
 public enum size_t minSize = 512 * kiB;
 /// Default maximal size of a chunk.
@@ -123,6 +120,79 @@ static this()
 	cache.mutex = new Object;
 }
 
+/// Calculates a streaming Rabin Fingerprint.
+private struct Hash
+{
+	alias Digest = ulong;
+
+	/// Size of the sliding window.
+	private enum size_t windowSize = 64;
+
+	/// Current contents of the sliding window.
+	private ubyte[windowSize] window;
+
+	struct FastState
+	{
+		/// Sliding window cursor.
+		private size_t wpos;
+
+		/// Current hash digest value.
+		private Digest digest;
+
+		/// Pointer to the sliding window.
+		private ubyte[windowSize]* window;
+	}
+	private FastState fastState;
+
+	FastState getFastState()
+	{
+		auto result = fastState;
+		result.window = &this.window;
+		return result;
+	}
+
+	void start()
+	{
+		foreach (i; 0 .. windowSize)
+			window[i] = 0;
+		fastState.digest = 0;
+		fastState.wpos = 0;
+	}
+
+	@property Digest peek() { return fastState.digest; }
+
+	Digest finish()
+	{
+		auto result = fastState.digest;
+		start();
+		return result;
+	}
+
+	private static void slide(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, ref Pol[256] tabmod, uint polShift, ubyte b)
+	{
+		auto out_ = window[wpos];
+		window[wpos] = b;
+		digest ^= Digest(tabout[out_].value);
+		wpos++;
+		if (wpos >= windowSize)
+			wpos = 0;
+
+		digest = updateDigest(digest, polShift, tabmod, b);
+	}
+
+	private static Digest /*newDigest*/ updateDigest(Digest digest, uint polShift, ref Pol[256] tabmod, ubyte b)
+	{
+		pragma(inline, true);
+		auto index = cast(ubyte)(digest >> polShift);
+		digest <<= 8;
+		digest |= Digest(b);
+
+		digest ^= Digest(tabmod[index].value);
+		return digest;
+	}
+}
+
+
 /// Splits content with Rabin Fingerprints.
 struct Chunker(R)
 {
@@ -138,42 +208,6 @@ struct Chunker(R)
 		public ulong cut;
 		/// Contents of the chunk.
 		public ubyte[] data;
-	}
-
-	private struct Hash
-	{
-		/// Current contents of the sliding window.
-		private ubyte[windowSize] window;
-
-		struct FastState
-		{
-			/// Sliding window cursor.
-			private size_t wpos;
-
-			/// Current hash digest value.
-			private ulong digest;
-
-			/// Pointer to the sliding window.
-			private ubyte[windowSize]* window;
-		}
-		private FastState fastState;
-
-		FastState getFastState()
-		{
-			auto result = fastState;
-			result.window = &this.window;
-			return result;
-		}
-
-		void reset()
-		{
-			foreach (i; 0 .. windowSize)
-				window[i] = 0;
-			fastState.digest = 0;
-			fastState.wpos = 0;
-		}
-
-		@property ulong digest() { return fastState.digest; }
 	}
 
 	private struct State
@@ -275,14 +309,14 @@ struct Chunker(R)
 		config.polShift = uint(config.pol.deg() - 8);
 		fillTables();
 
-		state.hash.reset();
+		state.hash.start();
 
 		config.closed = false;
 		slide(1);
 		state.start = state.pos;
 
 		// do not start a new chunk unless at least minSize bytes have been read
-		state.pre = config.minSize - windowSize;
+		state.pre = config.minSize - Hash.windowSize;
 	}
 
 	/// `fillTables` calculates `out_table` and `mod_table` for
@@ -321,7 +355,7 @@ struct Chunker(R)
 				Pol h;
 
 				h = appendByte(h, cast(ubyte)b, config.pol);
-				foreach (i; 0 .. windowSize-1)
+				foreach (i; 0 .. Hash.windowSize-1)
 					h = appendByte(h, 0, config.pol);
 				config.tables.out_[b] = h;
 			}
@@ -381,7 +415,7 @@ struct Chunker(R)
 						(
 							/*Start: */ state.start,
 							/*Length:*/ state.count,
-							/*Cut:   */ state.hash.digest,
+							/*Cut:   */ state.hash.peek,
 							/*Data:  */ data,
 						);
 				}
@@ -419,7 +453,7 @@ struct Chunker(R)
 			auto hash = state.hash.getFastState();
 			foreach (_, b; buf[state.bpos .. state.bmax])
 			{
-				.slide(*hash.window, hash.wpos, hash.digest, *tabout, *tabmod, polShift, b);
+				Hash.slide(*hash.window, hash.wpos, hash.digest, *tabout, *tabmod, polShift, b);
 
 				add++;
 				if (add < minSize)
@@ -458,31 +492,8 @@ struct Chunker(R)
 
 	private void slide(ubyte b)
 	{
-		.slide(state.hash.window, state.hash.fastState.wpos, state.hash.fastState.digest, config.tables.out_, config.tables.mod, config.polShift, b);
+		Hash.slide(state.hash.window, state.hash.fastState.wpos, state.hash.fastState.digest, config.tables.out_, config.tables.mod, config.polShift, b);
 	}
-}
-
-private void slide(ref ubyte[windowSize] window, ref size_t wpos, ref ulong digest, ref Pol[256] tabout, ref Pol[256] tabmod, uint polShift, ubyte b)
-{
-	auto out_ = window[wpos];
-	window[wpos] = b;
-	digest ^= ulong(tabout[out_].value);
-	wpos++;
-	if (wpos >= windowSize)
-		wpos = 0;
-
-	digest = updateDigest(digest, polShift, tabmod, b);
-}
-
-private ulong /*newDigest*/ updateDigest(ulong digest, uint polShift, ref Pol[256] tabmod, ubyte b)
-{
-	pragma(inline, true);
-	auto index = cast(ubyte)(digest >> polShift);
-	digest <<= 8;
-	digest |= ulong(b);
-
-	digest ^= ulong(tabmod[index].value);
-	return digest;
 }
 
 private Pol appendByte(Pol hash, ubyte b, Pol pol)
