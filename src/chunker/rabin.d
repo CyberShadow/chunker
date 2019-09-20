@@ -61,6 +61,14 @@ struct RabinHash
 			{
 				Pol h;
 
+				static Pol appendByte(Pol hash, ubyte b, Pol pol)
+				{
+					hash.value <<= 8;
+					hash.value |= Pol.Base(b);
+
+					return hash % pol;
+				}
+
 				h = appendByte(h, cast(ubyte)b, pol);
 				foreach (i; 0 .. RabinHash.windowSize-1)
 					h = appendByte(h, 0, pol);
@@ -208,12 +216,4 @@ struct RabinHash
 		digest ^= Digest(tabmod[index].value);
 		return digest;
 	}
-}
-
-private Pol appendByte(Pol hash, ubyte b, Pol pol)
-{
-	hash.value <<= 8;
-	hash.value |= Pol.Base(b);
-
-	return hash % pol;
 }
