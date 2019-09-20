@@ -440,6 +440,39 @@ TestChunk[] chunks3 =
 	{237392, 0x0000000000000001, parseDigest!"fcd567f5d866357a8e299fd5b2359bb2c8157c30395229c4e9b0a353944a7978"},
 ];
 
+/// same as chunks1, but with a much bounded min/max size
+TestChunk[] chunks4 =
+[
+	{1310720, 0x0008ec095c2a5e99, parseDigest!"5997b608c2a8b7d827bdfbd69dcffa86984c3a754aa4be92292f9f2ba0af4c22"},
+	{852740, 0x000b98d4cdf00000, parseDigest!"8df8723fbcb4639c94cd831a3d8c8a6ff3ff746fe77769ee2244d1ef69bbe31e"},
+	{1310720, 0x0008271396402fa4, parseDigest!"7c29efffbda477bbe56274573c3ba1b7e616eb76f3b9c92168a1f214aa557ba6"},
+	{861939, 0x0015a25c2ef00000, parseDigest!"5080a1c4d3b538dce8c04c7738a043185d8c76e3251ae69e483b4b17d94dd7b9"},
+	{1310720, 0x000fe23afea2e3be, parseDigest!"95507aa5fb821925e92ece579b5b50df0a6b311bd517937c4ae1a39e14cb79ea"},
+	{1310720, 0x000e7cc6e6b093f0, parseDigest!"d2efa31fd050ca04232401b84a06fbde30bcc62f2108a5c0f52cca319952ab90"},
+	{1310720, 0x00090b61ebb67fc7, parseDigest!"3a7e29b6a323b111ff5860953de004dfb0f69e5ccadb8831176cb0a6e3563262"},
+	{1310720, 0x0008998f21ddfe08, parseDigest!"d25815c6d82e29d8d59fdde4bd85804526cd45b027106e9526d2bfdba6e8c7ae"},
+	{1310720, 0x0010ebc94474a0db, parseDigest!"1ef10b00b9894102517e4a2d201877c9eba662dcbd22b2259f44c2c88436cbae"},
+	{1310720, 0x00180e6341e54abb, parseDigest!"d7a9ebce0573e5a2f6d688a495044766b2323a7a8b73ad2a9f1bdead52429d83"},
+	{1310720, 0x0010fa125ffa7553, parseDigest!"9803d879cf7cc8221eae87c2bf1ac9e6a4328929dfe32e5cb461663186402531"},
+	{1310720, 0x000884f3046bc00f, parseDigest!"0d35b3a8949b673821f004eb845af80ae34f082dd4c20b7715c42aff21aeabad"},
+	{1310720, 0x00154b752483d77e, parseDigest!"fb464beea91aee4eb91b7e5da58cc51f28a9ee74a61bc5ea40e703603e860fd8"},
+	{1310720, 0x00068be82cf57932, parseDigest!"ab4ebe4015214c4f449782ded96011d3ac1be3daa682a1df2d1905104008f1b5"},
+	{1310720, 0x000a1c2e12d6c196, parseDigest!"9198f8799fc64d2f6da6365a42f32c7b2d31ebfb23ccd957b705cfc24c69bc5e"},
+	{1310720, 0x000f73c53cb2ae82, parseDigest!"2d05e2f054b3ce480e7ffa4490db250ed2126fe36b8d767fc51c6e2d3baff87b"},
+	{915082, 0x000f55a1fea00000, parseDigest!"bcc88a08794bf3f194afa0c351836846eed95acfe7de41dc32d7f63c8fa02a4c"},
+	{1310720, 0x0016d908ad8f8bbc, parseDigest!"214f5fdf4136b08499ae944d6507ae97ae0eee5e051e336182a18d0881251d96"},
+	{1310720, 0x001740bda9456bd2, parseDigest!"1fcdad3287449b74a61ac626599dc9b0efb7bf01b599931f141f0ec340547c06"},
+	{1310720, 0x000c1606d9a0d99f, parseDigest!"d88982bf999af432cfcc94bace5000308cbb1cc6cd2126286d6304ebd83c4765"},
+	{837117, 0x00030ce2d9400000, parseDigest!"bf6c025df617eac82f643026d1d0295159a63a4e8dea41ed0341bd0469cbd7d3"},
+	{1310720, 0x0008fb9882a96b1f, parseDigest!"b5a2a7d0dfaa4d66e6c693afe77037cd42a21deac68f21fdafdfdeeea881e6a1"},
+	{1151715, 0x000968473f900000, parseDigest!"31882d126190910a0260abe5d10cb31b180e3e2d0d2c3e45981a78e1675738a5"},
+	{1310720, 0x0015cadcf5b2d7ac, parseDigest!"7d878ceb8e6ef8a3adc8a892a6c32d8afc93b9ea6b8a55d2271230847fa4b925"},
+	{1142792, 0x001e197c92600000, parseDigest!"96095ef256bb29934c024dbd0e3eab9c9dee2aa3308a7f4d77f20ae712ea57f1"},
+	{1310720, 0x0005408e6716fd12, parseDigest!"2825054e95b14ceb9f6c1947e5f5da0b34ce898850e05390adfcd976a271c107"},
+	{1310720, 0x000fb439ba516157, parseDigest!"eb4d3e5686f4cc810faa8bb356dbdd3242cb9acfd87fa7c2229c44f3f33aa714"},
+	{267927, 0x0000000000000001, parseDigest!"19f1aa1f5c3b49452675de394497fe5943cd00ee5a61291c6c0ca92b01ca2312"},
+];
+
 import std.format;
 
 private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] testChunks, bool checkDigest)
@@ -509,6 +542,16 @@ import std.array : replicate;
 	// sligthly decrease averageBits to get more chunks
 	ch.setAverageBits(19);
 	testWithData(ch, chunks3, true);
+}
+
+@(`ChunkerWithCustomMinMax`) unittest
+{
+	auto buf = getRandom(23, 32*1024*1024);
+	auto ch = Chunker!File(bufFile(buf), testPol,
+		(1 << 20) - (1 << 18),
+		(1 << 20) + (1 << 18));
+
+	testWithData(ch, chunks4, true);
 }
 
 import std.stdio : stderr;
