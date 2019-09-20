@@ -126,8 +126,6 @@ struct Chunker(R)
 		private ubyte[] buf;
 		/// Current read position within `buf`.
 		private size_t bpos;
-		/// Number of bytes of data in `buf`.
-		private @property size_t bmax() { return buf.length; }
 
 		/// Start offset of the current chunk.
 		private size_t start;
@@ -208,7 +206,7 @@ struct Chunker(R)
 		auto buf = state.buf;
 		while (true)
 		{
-			if (state.bpos >= state.bmax)
+			if (state.bpos >= state.buf.length)
 			{
 				if (config.rd.empty)
 					return Chunk.init;
@@ -237,17 +235,19 @@ struct Chunker(R)
 				state.bpos = 0;
 			}
 
+			auto bmax = state.buf.length;
+
 			// check if bytes have to be dismissed before starting a new chunk
 			if (state.pre > 0)
 			{
-				auto n = state.bmax - state.bpos;
+				auto n = bmax - state.bpos;
 				if (state.pre > n)
 				{
 					state.pre -= n;
-					data ~= buf[state.bpos .. state.bmax];
+					data ~= buf[state.bpos .. bmax];
 
 					state.pos += n;
-					state.bpos = state.bmax;
+					state.bpos = bmax;
 
 					continue;
 				}
@@ -264,19 +264,19 @@ struct Chunker(R)
 			if (add < minSize)
 			{
 				auto warmUp = minSize - add;
-				if (warmUp > state.bmax - bpos)
-					warmUp = state.bmax - bpos;
+				if (warmUp > bmax - bpos)
+					warmUp = bmax - bpos;
 				state.hash.put(buf[bpos .. bpos + warmUp]);
 				add += warmUp;
 				bpos += warmUp;
 			}
 
-			auto toWrite = state.bmax - bpos;
+			auto toWrite = bmax - bpos;
 			if (add + toWrite > maxSize)
 				toWrite = maxSize - add;
 			auto written = state.hash.putUntil(buf[bpos .. bpos + toWrite], config.splitmask);
 			add += written;
-			if (bpos + written != state.bmax)
+			if (bpos + written != bmax)
 			{
 				auto i = add - state.count;
 				data ~= state.buf[state.bpos .. state.bpos+i];
@@ -297,11 +297,11 @@ struct Chunker(R)
 				return chunk;
 			}
 
-			auto steps = state.bmax - state.bpos;
+			auto steps = bmax - state.bpos;
 			if (steps > 0)
 				data ~= state.buf[state.bpos .. state.bpos+steps];
 			state.pos += steps;
-			state.bpos = state.bmax;
+			state.bpos = bmax;
 		}
 	}
 }
