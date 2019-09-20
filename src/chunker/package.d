@@ -233,7 +233,7 @@ struct Chunker(R)
 						);
 				}
 
-				state.buf = config.rd.front;
+				buf = state.buf = config.rd.front;
 
 				state.bpos = 0;
 			}
