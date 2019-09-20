@@ -98,11 +98,11 @@ private enum size_t kiB = 1024;
 private enum size_t miB = 1024 * kiB;
 
 /// Aim to create chunks of 20 bits or about 1MiB on average.
-public enum size_t averageBits = 20;
+public enum size_t chunkDefaultAverageBits = 20;
 /// Default minimal size of a chunk.
-public enum size_t minSize = 512 * kiB;
+public enum size_t chunkDefaultMinSize = 512 * kiB;
 /// Default maximal size of a chunk.
-public enum size_t maxSize = 8 * miB;
+public enum size_t chunkDefaultMaxSize = 8 * miB;
 
 
 /// Splits content with Rabin Fingerprints.
@@ -147,12 +147,12 @@ struct Chunker(R)
 
 	/// Probably use the `byCDChunk` convenience function instead of this constructor directly.
 	/// Note that `Chunker` will `popFront` the input range during construction.
-	public this(R source, Pol pol, uint averageBits, size_t min, size_t max, ubyte[] cbuf)
+	public this(R source, Pol pol, uint averageBits, size_t minSize, size_t maxSize, ubyte[] cbuf)
 	{
-		this.cbuf = cbuf ? cbuf : new ubyte[max];
+		this.cbuf = cbuf ? cbuf : new ubyte[maxSize];
 		this.source = source;
-		this.minSize = min;
-		this.maxSize = max;
+		this.minSize = minSize;
+		this.maxSize = maxSize;
 		this.splitmask = (1L << averageBits) - 1;
 		this.hash = RabinHash(pol);
 		if (this.source.empty)
@@ -267,15 +267,21 @@ struct Chunker(R)
 ///     discovery: the lower `averageBits`, the higher amount of
 ///     chunks will be identified.  The default value is 20 bits,
 ///     so chunks will be of 1MiB size on average.
-Chunker!R byCDChunk(R)(R source, Pol pol, uint averageBits = .averageBits, size_t min = minSize, size_t max = maxSize, ubyte[] cbuf = null)
+Chunker!R byCDChunk(R)(
+	R source,
+	Pol pol,
+	uint averageBits = chunkDefaultAverageBits,
+	size_t minSize = chunkDefaultMinSize,
+	size_t maxSize = chunkDefaultMaxSize,
+	ubyte[] cbuf = null)
 {
-	return Chunker!R(source, pol, averageBits, min, max, cbuf);
+	return Chunker!R(source, pol, averageBits, minSize, maxSize, cbuf);
 }
 
 /// ditto
 Chunker!R byCDChunk(R)(R source, Pol pol, ubyte[] cbuf)
 {
-	return Chunker!R(source, pol, .averageBits, minSize, maxSize, cbuf);
+	return Chunker!R(source, pol, chunkDefaultAverageBits, chunkDefaultMinSize, chunkDefaultMaxSize, cbuf);
 }
 
 // -----------------------------------------------------------------------------
@@ -340,10 +346,10 @@ TestChunk[] chunks1 =
 /// test if nullbytes are correctly split, even if length is a multiple of minSize.
 TestChunk[] chunks2 =
 [
-	{minSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
-	{minSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
-	{minSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
-	{minSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
+	{chunkDefaultMinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
+	{chunkDefaultMinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
+	{chunkDefaultMinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
+	{chunkDefaultMinSize, 0, parseDigest!"07854d2fef297a06ba81685e660c332de36d5d18d546927d30daad6d7fda1541"},
 ];
 
 /// the same as chunks1, but avg chunksize is 1<<19
@@ -468,7 +474,7 @@ import std.range : chunks;
 	testWithData(ch, chunks1, true);
 
 	// setup nullbyte data source
-	data = replicate([ubyte(0)], chunks2.length*minSize);
+	data = replicate([ubyte(0)], chunks2.length*chunkDefaultMinSize);
 	ch = data.chunks(chunkerBufSize).byCDChunk(testPol);
 
 	testWithData(ch, chunks2, true);
@@ -481,7 +487,7 @@ import std.range : chunks;
 	auto ch = [data].byCDChunk(testPol);
 	testWithData(ch, chunks1, true);
 
-	data = replicate([ubyte(0)], chunks2.length*minSize);
+	data = replicate([ubyte(0)], chunks2.length*chunkDefaultMinSize);
 	ch = [data].byCDChunk(testPol);
 	testWithData(ch, chunks2, true);
 }
@@ -497,7 +503,7 @@ import std.range : chunks;
 	auto ch = File("test.bin", "rb").byChunk(chunkerBufSize).byCDChunk(testPol);
 	testWithData(ch, chunks1, true);
 
-	data = replicate([ubyte(0)], chunks2.length*minSize);
+	data = replicate([ubyte(0)], chunks2.length*chunkDefaultMinSize);
 	File("test.bin", "wb").rawWrite(data);
 	ch = File("test.bin", "rb").byChunk(chunkerBufSize).byCDChunk(testPol);
 	testWithData(ch, chunks2, true);
@@ -597,7 +603,7 @@ import std.stdio : stderr;
 	}
 
 	// setup nullbyte data source
-	data = replicate([ubyte(0)], chunks2.length*minSize);
+	data = replicate([ubyte(0)], chunks2.length*chunkDefaultMinSize);
 	ch = data.chunks(chunkerBufSize).byCDChunk(testPol);
 
 	testWithData(ch, chunks2, false);
@@ -611,7 +617,7 @@ version (benchmarkChunker)
 	void _benchmarkChunker(bool checkDigest)
 	{
 		auto size = 32 * 1024 * 1024;
-		auto buf = new ubyte[maxSize];
+		auto buf = new ubyte[chunkDefaultMaxSize];
 		auto data = [getRandom(23, size)];
 
 		// b.SetBytes(long(size));
