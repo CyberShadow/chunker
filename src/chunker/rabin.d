@@ -9,14 +9,8 @@ struct RabinHash
 	private struct Cache
 	{
 		Tables[Pol] entries;
-		Object mutex;
 	}
 	private __gshared Cache cache;
-
-	shared static this()
-	{
-		cache.mutex = new Object;
-	}
 
 	private struct Tables
 	{
@@ -37,7 +31,7 @@ struct RabinHash
 		tablesInitialized = true;
 
 		// test if the tables are cached for this polynomial
-		synchronized(cache.mutex)
+		synchronized
 		{
 			if (auto t = pol in cache.entries)
 			{
