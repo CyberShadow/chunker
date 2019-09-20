@@ -123,19 +123,15 @@ struct Chunker(R)
 		/// Current hash internal state.
 		RabinHash hash;
 
-		/// Buffer used to copy chunk data to.
-		ubyte[] cbuf;
 		/// Buffer used to receive and keep read data in.
 		ubyte[] buf;
 		/// Current read position within `buf`.
 		size_t bpos;
 
-		/// Start offset of the current chunk.
-		size_t start;
+		/// Buffer used to copy chunk data to.
+		ubyte[] cbuf;
 		/// Number of bytes within the current chunk.
-		@property size_t count() { return pos - start; }
-		/// Current position within the stream.
-		size_t pos;
+		size_t count;
 	}
 
 	private // configuration
@@ -181,7 +177,7 @@ struct Chunker(R)
 		if (this.cbuf.length < newLen)
 			this.cbuf.length = newLen;
 		this.cbuf[this.count .. newLen] = bytes[];
-		this.pos += numBytes;
+		this.count += numBytes;
 	}
 
 	/// Updates `front` to contain the position and data of the next
@@ -193,7 +189,7 @@ struct Chunker(R)
 
 		this.hash.start();
 		this.hash.slide(1);
-		this.start = this.pos;
+		this.count = 0;
 		auto minSize = this.minSize;
 		auto maxSize = this.maxSize;
 		// do not start a new chunk unless at least minSize bytes have been read
