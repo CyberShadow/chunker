@@ -190,6 +190,12 @@ private struct Hash
 	/// Calculated from the polynomial's degree.
 	private uint polShift;
 
+	this(Pol pol)
+	{
+		polShift = uint(pol.deg() - 8);
+		fillTables(pol);
+	}
+
 	// ---------------------------------------------------------------------
 
 	alias Digest = ulong;
@@ -339,8 +345,7 @@ struct Chunker(R)
 		config.minSize = min;
 		config.maxSize = max;
 		config.splitmask = (1 << 20) - 1; // aim to create chunks of 20 bits or about 1MiB on average.
-		state.hash.polShift = uint(pol.deg() - 8);
-		state.hash.fillTables(pol);
+		state.hash = Hash(pol);
 		reset();
 	}
 
