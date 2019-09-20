@@ -8,13 +8,12 @@ struct RabinHash
 	// cache precomputed tables, these are read-only anyway
 	private struct Cache
 	{
-	static:
 		Tables[Pol] entries;
 		Object mutex;
 	}
-	private static Cache cache;
+	private __gshared Cache cache;
 
-	static this()
+	shared static this()
 	{
 		cache.mutex = new Object;
 	}
