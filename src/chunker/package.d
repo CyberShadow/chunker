@@ -102,7 +102,7 @@ private enum chunkerBufSize = 512 * kiB;
 
 
 /// Calculates a streaming Rabin Fingerprint.
-private struct Hash
+struct RabinHash
 {
 	// cache precomputed tables, these are read-only anyway
 	private struct Cache
@@ -161,7 +161,7 @@ private struct Hash
 				Pol h;
 
 				h = appendByte(h, cast(ubyte)b, pol);
-				foreach (i; 0 .. Hash.windowSize-1)
+				foreach (i; 0 .. RabinHash.windowSize-1)
 					h = appendByte(h, 0, pol);
 				tables.out_[b] = h;
 			}
@@ -190,6 +190,7 @@ private struct Hash
 	/// Calculated from the polynomial's degree.
 	private uint polShift;
 
+	/// Initializes this `RabinHash` with the given polynomial.
 	this(Pol pol)
 	{
 		polShift = uint(pol.deg() - 8);
@@ -198,10 +199,11 @@ private struct Hash
 
 	// ---------------------------------------------------------------------
 
+	/// Base type for the calculated digest.
 	alias Digest = ulong;
 
 	/// Size of the sliding window.
-	private enum size_t windowSize = 64;
+	public enum size_t windowSize = 64;
 
 	/// Current contents of the sliding window.
 	private ubyte[windowSize] window;
@@ -216,8 +218,10 @@ private struct Hash
 		/// Current hash digest value.
 		private Digest digest;
 	}
-	Scalars scalars;
+	/// ditto
+	private Scalars scalars;
 
+	/// Reset internal state.
 	void start()
 	{
 		foreach (i; 0 .. windowSize)
@@ -226,8 +230,10 @@ private struct Hash
 		scalars.wpos = 0;
 	}
 
+	/// Return current digest.
 	@property Digest peek() const { return scalars.digest; }
 
+	/// Return current digest, then reset.
 	Digest finish()
 	{
 		auto result = scalars.digest;
@@ -242,34 +248,44 @@ private struct Hash
 	/// may break it up and place the fields in registers.
 	struct Writer
 	{
+		/// Contained scalar values.
 		private Scalars scalars;
-		private Hash* hash;
+		/// Pointer to the rest of the object.
+		private RabinHash* hash;
 
+		/// Return current digest.
 		public @property Digest peek() const { return scalars.digest; }
 
+		/// Update the hash with one byte.
 		public void slide(ubyte b)
 		{
-			Hash.slide(hash.window, scalars.wpos, scalars.digest, hash.tables.out_, hash.tables.mod, hash.polShift, b);
+			slideImpl(hash.window, scalars.wpos, scalars.digest, hash.tables.out_, hash.tables.mod, hash.polShift, b);
 		}
 	}
 
+	/// Return a fast writer object.
+	/// Must be committed at the end using `commit`.
 	Writer getWriter()
 	{
+		assert(tablesInitialized, "tables for polynomial computation not initialized");
 		return Writer(scalars, &this);
 	}
 
+	/// Commit a `Writer`.
 	void commit(ref Writer writer)
 	{
 		assert(writer.hash == &this);
 		this.scalars = writer.scalars;
 	}
 
+	/// Update the hash with one byte.
 	public void slide(ubyte b)
 	{
-		slide(window, scalars.wpos, scalars.digest, tables.out_, tables.mod, polShift, b);
+		slideImpl(window, scalars.wpos, scalars.digest, tables.out_, tables.mod, polShift, b);
 	}
 
-	public static void slide(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, in ref Pol[256] tabmod, uint polShift, ubyte b)
+	/// Implementation for `slide`.
+	private static void slideImpl(ref ubyte[windowSize] window, ref size_t wpos, ref Digest digest, ref Pol[256] tabout, in ref Pol[256] tabmod, uint polShift, ubyte b)
 	{
 		auto out_ = window[wpos];
 		window[wpos] = b;
@@ -281,6 +297,7 @@ private struct Hash
 		digest = updateDigest(digest, polShift, tabmod, b);
 	}
 
+	/// ditto
 	private static Digest /*newDigest*/ updateDigest(Digest digest, uint polShift, in ref Pol[256] tabmod, ubyte b)
 	{
 		auto index = cast(ubyte)(digest >> polShift);
@@ -313,7 +330,7 @@ struct Chunker(R)
 	private struct State
 	{
 		/// Current hash internal state.
-		private Hash hash;
+		private RabinHash hash;
 
 		/// Buffer used to receive and keep read data in.
 		private ubyte[] buf;
@@ -371,7 +388,7 @@ struct Chunker(R)
 		config.minSize = min;
 		config.maxSize = max;
 		config.splitmask = (1 << 20) - 1; // aim to create chunks of 20 bits or about 1MiB on average.
-		state.hash = Hash(pol);
+		state.hash = RabinHash(pol);
 		reset();
 	}
 
@@ -384,7 +401,7 @@ struct Chunker(R)
 		state.start = state.pos;
 
 		// do not start a new chunk unless at least minSize bytes have been read
-		state.pre = config.minSize - Hash.windowSize;
+		state.pre = config.minSize - RabinHash.windowSize;
 	}
 
 	/// Returns the position and length of the next chunk of data.
@@ -395,8 +412,6 @@ struct Chunker(R)
 	public Chunk next(ubyte[] data)
 	{
 		data = data[0..0];
-		if (!state.hash.tablesInitialized)
-			throw new Exception("tables for polynomial computation not initialized");
 
 		auto minSize = config.minSize;
 		auto maxSize = config.maxSize;
