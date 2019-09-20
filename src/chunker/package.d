@@ -99,8 +99,6 @@ public enum size_t minSize = 512 * kiB;
 /// Default maximal size of a chunk.
 public enum size_t maxSize = 8 * miB;
 
-private enum chunkerBufSize = 512 * kiB;
-
 
 /// Splits content with Rabin Fingerprints.
 struct Chunker(R)
@@ -129,7 +127,7 @@ struct Chunker(R)
 		/// Current read position within `buf`.
 		private size_t bpos;
 		/// Number of bytes of data in `buf`.
-		private size_t bmax;
+		private @property size_t bmax() { return buf.length; }
 
 		/// Start offset of the current chunk.
 		private size_t start;
@@ -174,7 +172,7 @@ struct Chunker(R)
 	public this(R rd, Pol pol, size_t min = minSize, size_t max = maxSize)
 	{
 		state = State();
-		state.buf = new ubyte[chunkerBufSize];
+		state.buf = rd.empty ? null : rd.front;
 		config = Config();
 		config.rd = rd;
 		config.minSize = min;
@@ -212,11 +210,14 @@ struct Chunker(R)
 		{
 			if (state.bpos >= state.bmax)
 			{
-				auto n = config.rd.rawRead(buf[]).length;
+				if (config.rd.empty)
+					return Chunk.init;
+
+				config.rd.popFront();
 
 				// There are no more bytes to buffer, so this was the last
 				// chunk.
-				if (n == 0 && !config.closed)
+				if (config.rd.empty && !config.closed)
 				{
 					config.closed = true;
 
@@ -231,11 +232,9 @@ struct Chunker(R)
 						);
 				}
 
-				if (n == 0)
-					return Chunk.init;
+				state.buf = config.rd.front;
 
 				state.bpos = 0;
-				state.bmax = n;
 			}
 
 			// check if bytes have to be dismissed before starting a new chunk
@@ -307,6 +306,11 @@ struct Chunker(R)
 	}
 }
 
+Chunker!R byCDChunk(R)(R rd, Pol pol, size_t min = minSize, size_t max = maxSize)
+{
+	return Chunker!R(rd, pol, min, max);
+}
+
 // -----------------------------------------------------------------------------
 version(unittest) version = test;
 version(benchmarkChunker) version = test;
@@ -314,6 +318,8 @@ version(test):
 private:
 
 import chunker.internal.helpers;
+
+private enum chunkerBufSize = 512 * kiB;
 
 private template parseDigest(string s)
 {
@@ -494,12 +500,12 @@ import std.array : replicate;
 {
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = Chunker!File(bufFile(buf), testPol);
-	testWithData!File(ch, chunks1, true);
+	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
+	testWithData(ch, chunks1, true);
 
 	// setup nullbyte data source
 	buf = replicate([ubyte(0)], chunks2.length*minSize);
-	ch = Chunker!File(bufFile(buf), testPol);
+	ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
 
 	testWithData(ch, chunks2, true);
 }
@@ -507,7 +513,7 @@ import std.array : replicate;
 @(`ChunkerWithCustomAverageBits`) unittest
 {
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = Chunker!File(bufFile(buf), testPol);
+	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
 
 	// sligthly decrease averageBits to get more chunks
 	ch.setAverageBits(19);
@@ -517,7 +523,7 @@ import std.array : replicate;
 @(`ChunkerWithCustomMinMax`) unittest
 {
 	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = Chunker!File(bufFile(buf), testPol,
+	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol,
 		(1 << 20) - (1 << 18),
 		(1 << 20) + (1 << 18));
 
@@ -529,7 +535,7 @@ import std.array : replicate;
 @(`ChunkerMinMaxBounds`) unittest
 {
 	auto buf = getRandom(23, 64*1024);
-	auto ch = Chunker!File(bufFile(buf), testPol,
+	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol,
 		RabinHash.windowSize * 2 - 2,
 		RabinHash.windowSize * 2 + 2);
 	ch.setAverageBits(7);
@@ -558,7 +564,7 @@ import std.stdio : stderr;
 	stderr.writefln!"generating random polynomial took %s"(Clock.currTime() - start);
 
 	start = Clock.currTime();
-	auto ch = Chunker!File(bufFile(buf), p);
+	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), p);
 	stderr.writefln!"creating chunker took %s"(Clock.currTime() - start);
 
 	// make sure that first chunk is different
@@ -579,7 +585,7 @@ import std.stdio : stderr;
 	// setup data source
 	auto buf = getRandom(23, 32*1024*1024);
 
-	auto ch = Chunker!File(bufFile(buf), testPol);
+	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
 	auto chunks = testWithData(ch, chunks1, false);
 
 	// test reader
@@ -596,7 +602,7 @@ import std.stdio : stderr;
 
 	// setup nullbyte data source
 	buf = replicate([ubyte(0)], chunks2.length*minSize);
-	ch = Chunker!File(bufFile(buf), testPol);
+	ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
 
 	testWithData(ch, chunks2, false);
 }
@@ -609,9 +615,8 @@ version (benchmarkChunker)
 	void _benchmarkChunker(bool checkDigest)
 	{
 		auto size = 32 * 1024 * 1024;
-		auto rd = bufFile(getRandom(23, size));
-		Chunker!File ch;
 		auto buf = new ubyte[maxSize];
+		auto rd = bufFile(getRandom(23, size));
 
 		// b.SetBytes(long(size));
 
@@ -620,8 +625,7 @@ version (benchmarkChunker)
 			chunks = 0;
 
 			rd.seek(0);
-
-			ch = Chunker!File(rd, testPol);
+			auto ch = byCDChunk(rd.byChunk(chunkerBufSize), testPol);
 
 			auto cur = 0;
 			while (true)
@@ -672,7 +676,7 @@ version (benchmarkChunker)
 		auto p = Pol.getRandom();
 
 		Benchmark.benchmark({
-			Chunker!File(bufFile(null), p);
+			byCDChunk(bufFile(null).byChunk(chunkerBufSize), p);
 		});
 	}
 }

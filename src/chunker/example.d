@@ -12,7 +12,7 @@ void main()
 	auto data = getRandom(23, 32*1024*1024);
 
 	// create a chunker
-	auto chunker = Chunker!File(bufFile(data), Pol(0x3DA3358B4DC173));
+	auto chunker = byCDChunk(bufFile(data).byChunk(512*1024), Pol(0x3DA3358B4DC173));
 
 	// reuse this buffer
 	auto buf = new ubyte[8*1024*1024];
