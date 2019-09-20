@@ -269,14 +269,7 @@ struct Chunker(R)
 
 	/// Constructs a new `Chunker` based on polynomial `pol` that
 	/// reads from `rd`.
-	public this(R rd, Pol pol)
-	{
-		this(rd, pol, minSize, maxSize);
-	}
-
-	/// Constructs a new `Chunker` based on polynomial `pol` that
-	/// reads from `rd` and custom `min` and `max` size boundaries.
-	public this(R rd, Pol pol, size_t min, size_t max)
+	public this(R rd, Pol pol, size_t min = minSize, size_t max = maxSize)
 	{
 		state = State();
 		state.buf = new ubyte[chunkerBufSize];
