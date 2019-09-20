@@ -140,12 +140,46 @@ struct Chunker(R)
 		public ubyte[] data;
 	}
 
-	private struct State
+	private struct Hash
 	{
 		/// Current contents of the sliding window.
 		private ubyte[windowSize] window;
-		/// Sliding window cursor.
-		private size_t wpos;
+
+		struct FastState
+		{
+			/// Sliding window cursor.
+			private size_t wpos;
+
+			/// Current hash digest value.
+			private ulong digest;
+
+			/// Pointer to the sliding window.
+			private ubyte[windowSize]* window;
+		}
+		private FastState fastState;
+
+		FastState getFastState()
+		{
+			auto result = fastState;
+			result.window = &this.window;
+			return result;
+		}
+
+		void reset()
+		{
+			foreach (i; 0 .. windowSize)
+				window[i] = 0;
+			fastState.digest = 0;
+			fastState.wpos = 0;
+		}
+
+		@property ulong digest() { return fastState.digest; }
+	}
+
+	private struct State
+	{
+		/// Current hash internal state.
+		private Hash hash;
 
 		/// Buffer used to receive and keep read data in.
 		private ubyte[] buf;
@@ -163,9 +197,6 @@ struct Chunker(R)
 
 		/// Skip this many bytes before calculating a new chunk.
 		private size_t pre;
-
-		/// Current hash digest value.
-		private ulong digest;
 	}
 
 	private struct Config
@@ -244,12 +275,9 @@ struct Chunker(R)
 		config.polShift = uint(config.pol.deg() - 8);
 		fillTables();
 
-		foreach (i; 0 .. windowSize)
-			state.window[i] = 0;
+		state.hash.reset();
 
 		config.closed = false;
-		state.digest = 0;
-		state.wpos = 0;
 		slide(1);
 		state.start = state.pos;
 
@@ -353,7 +381,7 @@ struct Chunker(R)
 						(
 							/*Start: */ state.start,
 							/*Length:*/ state.count,
-							/*Cut:   */ state.digest,
+							/*Cut:   */ state.hash.digest,
 							/*Data:  */ data,
 						);
 				}
@@ -388,18 +416,16 @@ struct Chunker(R)
 			}
 
 			auto add = state.count;
-			auto digest = state.digest;
-			auto window = state.window;
-			auto wpos = state.wpos;
+			auto hash = state.hash.getFastState();
 			foreach (_, b; buf[state.bpos .. state.bmax])
 			{
-				.slide(window, wpos, digest, *tabout, *tabmod, polShift, b);
+				.slide(*hash.window, hash.wpos, hash.digest, *tabout, *tabmod, polShift, b);
 
 				add++;
 				if (add < minSize)
 					continue;
 
-				if ((digest&config.splitmask) == 0 || add >= maxSize)
+				if ((hash.digest&config.splitmask) == 0 || add >= maxSize)
 				{
 					auto i = add - state.count;
 					data ~= state.buf[state.bpos .. state.bpos+i];
@@ -411,7 +437,7 @@ struct Chunker(R)
 					(
 						/*Start: */ state.start,
 						/*Length:*/ state.count,
-						/*Cut:   */ digest,
+						/*Cut:   */ hash.digest,
 						/*Data:  */ data,
 					);
 
@@ -420,9 +446,7 @@ struct Chunker(R)
 					return chunk;
 				}
 			}
-			state.digest = digest;
-			state.window = window;
-			state.wpos = wpos;
+			state.hash.fastState = hash;
 
 			auto steps = state.bmax - state.bpos;
 			if (steps > 0)
@@ -434,7 +458,7 @@ struct Chunker(R)
 
 	private void slide(ubyte b)
 	{
-		.slide(state.window, state.wpos, state.digest, config.tables.out_, config.tables.mod, config.polShift, b);
+		.slide(state.hash.window, state.hash.fastState.wpos, state.hash.fastState.digest, config.tables.out_, config.tables.mod, config.polShift, b);
 	}
 }
 
