@@ -242,9 +242,15 @@ private struct Hash
 	/// may break it up and place the fields in registers.
 	struct Writer
 	{
-		Scalars scalars;
-		Hash* hash;
-		@property Digest peek() const { return scalars.digest; }
+		private Scalars scalars;
+		private Hash* hash;
+
+		public @property Digest peek() const { return scalars.digest; }
+
+		public void slide(ubyte b)
+		{
+			Hash.slide(hash.window, scalars.wpos, scalars.digest, hash.tables.out_, hash.tables.mod, hash.polShift, b);
+		}
 	}
 
 	Writer getWriter()
@@ -454,7 +460,7 @@ struct Chunker(R)
 			auto hashWriter = state.hash.getWriter();
 			foreach (_, b; buf[state.bpos .. state.bmax])
 			{
-				Hash.slide(state.hash.window, hashWriter.scalars.wpos, hashWriter.scalars.digest, *tabout, *tabmod, polShift, b);
+				hashWriter.slide(b);
 
 				add++;
 				if (add < minSize)
