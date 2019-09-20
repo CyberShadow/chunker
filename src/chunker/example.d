@@ -2,6 +2,7 @@ module chunker.example;
 
 import chunker;
 import chunker.polynomials;
+import chunker.internal.helpers : getRandom, bufFile;
 
 void main()
 {
