@@ -110,14 +110,12 @@ struct Chunker(R)
 {
 	/// One content-dependent chunk of bytes whose end was cut when
 	/// the Rabin Fingerprint had the value stored in `cut`.
-	public struct Chunk
+	struct Chunk
 	{
-		/// Offset within the source data for the start of the chunk.
-		public size_t start;
-		/// Value of the rolling hash when the chunk was cut.
-		public ulong cut;
 		/// Contents of the chunk.
-		public ubyte[] data;
+		ubyte[] data;
+		/// Value of the rolling hash when the chunk was cut.
+		ulong cut;
 	}
 
 	private struct State
@@ -226,10 +224,12 @@ struct Chunker(R)
 					// the last chunk. Return current chunk, if any
 					// bytes have been processed.
 					if (state.count > 0)
-						front = Chunk(state.start, state.hash.peek, state.cbuf[0 .. state.count]);
+						break;
 					else
+					{
 						empty = true;
-					return;
+						return;
+					}
 				}
 
 				state.buf = config.rd.front;
@@ -276,13 +276,13 @@ struct Chunker(R)
 				auto i = add - state.count;
 				copyBytes(i);
 
-				front = Chunk(state.start, state.hash.peek(), state.cbuf[0 .. state.count]);
-				return;
+				break;
 			}
 
 			auto steps = bmax - state.bpos;
 			copyBytes(steps);
 		}
+		front = Chunk(state.cbuf[0 .. state.count], state.hash.peek());
 	}
 }
 
@@ -448,14 +448,9 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 {
 	Chunker!R.Chunk[] chunks;
 
-	size_t pos = 0;
 	foreach (i, chunk; testChunks)
 	{
 		auto c = chnker.front;
-
-		assert(c.start == pos,
-			format!"Start for chunk %d does not match: expected %d, got %d"
-			(i, pos, c.start));
 
 		assert(c.data.length == chunk.length,
 			format!"Length for chunk %d does not match: expected %d, got %d"
@@ -473,7 +468,6 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 				(i, testChunks.length-1, chunk.digest, digest));
 		}
 
-		pos += c.data.length;
 		if (copyData)
 			c.data = c.data.dup;
 		chunks ~= c;
@@ -615,15 +609,17 @@ import std.stdio : stderr;
 	auto chunks = testWithData(ch, chunks1, false, true);
 
 	// test reader
+	size_t pos = 0;
 	foreach (i, c; chunks)
 	{
 		assert(c.data.length == chunks1[i].length,
 			format!"reader returned wrong number of bytes: expected %d, got %d"
 			(chunks1[i].length, c.data.length));
 
-		assert(data[c.start .. c.start+c.data.length] == c.data,
+		assert(data[pos .. pos+c.data.length] == c.data,
 			format!"invalid data for chunk returned: expected %(%02x%), got %(%02x%)"
-			(data[c.start .. c.start+c.data.length], c.data));
+			(data[pos .. pos+c.data.length], c.data));
+		pos += c.data.length;
 	}
 
 	// setup nullbyte data source
