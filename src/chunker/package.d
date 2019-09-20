@@ -331,12 +331,6 @@ package ubyte[] getRandom(int seed, int count)
 	return buf;
 }
 
-package ubyte[32] hashData(ubyte[] d)
-{
-	import std.digest.sha;
-	return sha256Of(d);
-}
-
 // Temporary D shim
 import std.stdio : File;
 package File bufFile(ubyte[] buf)
@@ -478,7 +472,8 @@ TestChunk[] chunks4 =
 	{267927, 0x0000000000000001, parseDigest!"19f1aa1f5c3b49452675de394497fe5943cd00ee5a61291c6c0ca92b01ca2312"},
 ];
 
-import std.format;
+import std.format : format;
+import std.digest.sha : sha256Of;
 
 private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] testChunks, bool checkDigest)
 {
@@ -503,7 +498,7 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 
 		if (checkDigest)
 		{
-			auto digest = hashData(c.data);
+			auto digest = sha256Of(c.data);
 			assert(chunk.digest == digest,
 				format!"Digest fingerprint for chunk %d/%d does not match: expected %(%02x%), got %(%02x%)"
 				(i, testChunks.length-1, chunk.digest, digest));
@@ -605,7 +600,7 @@ import std.stdio : stderr;
 	assert(c.length != chunks1[0].length,
 		"Length is the same");
 
-	assert(hashData(c.data) != chunks1[0].digest,
+	assert(sha256Of(c.data) != chunks1[0].digest,
 		"Digest is the same");
 }
 
@@ -678,7 +673,7 @@ version (benchmarkChunker)
 
 				if (checkDigest)
 				{
-					auto h = hashData(chunk.data);
+					auto h = sha256Of(chunk.data);
 					assert(h == chunks1[cur].digest,
 						format!"wrong digest, want %(%02x%), got %(%02x%)"
 						(chunks1[cur].digest, h));
