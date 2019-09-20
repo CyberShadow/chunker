@@ -30,8 +30,7 @@ struct RabinHash
 	/// Reset internal state.
 	void start()
 	{
-		foreach (i; 0 .. windowSize)
-			window[i] = 0;
+		window[] = 0;
 		scalars.digest = 0;
 		scalars.wpos = 0;
 	}
