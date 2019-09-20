@@ -112,8 +112,6 @@ struct Chunker(R)
 	{
 		/// Offset within the source data for the start of the chunk.
 		public size_t start;
-		/// Length of the chunk.
-		public size_t length;
 		/// Value of the rolling hash when the chunk was cut.
 		public ulong cut;
 		/// Contents of the chunk.
@@ -238,7 +236,6 @@ struct Chunker(R)
 						return Chunk
 						(
 							/*Start: */ state.start,
-							/*Length:*/ state.count,
 							/*Cut:   */ state.hash.peek,
 							/*Data:  */ state.cbuf[0 .. state.count],
 						);
@@ -292,7 +289,6 @@ struct Chunker(R)
 				auto chunk = Chunk
 				(
 					/*Start: */ state.start,
-					/*Length:*/ state.count,
 					/*Cut:   */ state.hash.peek(),
 					/*Data:  */ state.cbuf[0 .. state.count],
 				);
@@ -471,9 +467,9 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 			format!"Start for chunk %d does not match: expected %d, got %d"
 			(i, pos, c.start));
 
-		assert(c.length == chunk.length,
+		assert(c.data.length == chunk.length,
 			format!"Length for chunk %d does not match: expected %d, got %d"
-			(i, chunk.length, c.length));
+			(i, chunk.length, c.data.length));
 
 		assert(c.cut == chunk.cutFP,
 			format!"Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x"
@@ -487,7 +483,7 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 				(i, testChunks.length-1, chunk.digest, digest));
 		}
 
-		pos += c.length;
+		pos += c.data.length;
 		if (copyData)
 			c.data = c.data.dup;
 		chunks ~= c;
@@ -581,8 +577,8 @@ import std.range : chunks;
 
 	size_t[] sizes;
 	for (auto chunk = ch.next(); chunk !is typeof(chunk).init; chunk = ch.next())
-		if (chunk.length != RabinHash.windowSize * 2 + 2)
-			sizes ~= chunk.length;
+		if (chunk.data.length != RabinHash.windowSize * 2 + 2)
+			sizes ~= chunk.data.length;
 
 	assert(sizes == [
 			126, 129, 126, 127, 128, 128, 126, 126, 127, 129,
@@ -612,7 +608,7 @@ import std.stdio : stderr;
 	assert(c.cut != chunks1[0].cutFP,
 		"Cut point is the same");
 
-	assert(c.length != chunks1[0].length,
+	assert(c.data.length != chunks1[0].length,
 		"Length is the same");
 
 	assert(sha256Of(c.data) != chunks1[0].digest,
@@ -634,9 +630,9 @@ import std.stdio : stderr;
 			format!"reader returned wrong number of bytes: expected %d, got %d"
 			(chunks1[i].length, c.data.length));
 
-		assert(data[c.start .. c.start+c.length] == c.data,
+		assert(data[c.start .. c.start+c.data.length] == c.data,
 			format!"invalid data for chunk returned: expected %(%02x%), got %(%02x%)"
-			(data[c.start .. c.start+c.length], c.data));
+			(data[c.start .. c.start+c.data.length], c.data));
 	}
 
 	// setup nullbyte data source
@@ -675,9 +671,9 @@ version (benchmarkChunker)
 					break;
 				}
 
-				assert(chunk.length == chunks1[cur].length,
+				assert(chunk.data.length == chunks1[cur].length,
 					format!"wrong chunk length, want %d, got %d"
-					(chunks1[cur].length, chunk.length));
+					(chunks1[cur].length, chunk.data.length));
 
 				assert(chunk.cut == chunks1[cur].cutFP,
 					format!"wrong cut fingerprint, want 0x%x, got 0x%x"

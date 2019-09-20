@@ -27,7 +27,7 @@ void main()
 		if (chunk is typeof(chunk).init)
 			break;
 
-		writefln!"%d %(%02x%)"(chunk.length, sha256Of(chunk.data));
+		writefln!"%d %(%02x%)"(chunk.data.length, sha256Of(chunk.data));
 	}
 
 	// Output:
