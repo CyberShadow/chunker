@@ -91,6 +91,9 @@ module chunker;
 import chunker.polynomials;
 import chunker.rabin;
 
+// Array support
+import std.range.primitives : empty, front, popFront;
+
 private enum size_t kiB = 1024;
 private enum size_t miB = 1024 * kiB;
 
@@ -499,21 +502,21 @@ import std.array : replicate;
 @(`Chunker`) unittest
 {
 	// setup data source
-	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
+	auto data = getRandom(23, 32*1024*1024);
+	auto ch = [data].byCDChunk(testPol);
 	testWithData(ch, chunks1, true);
 
 	// setup nullbyte data source
-	buf = replicate([ubyte(0)], chunks2.length*minSize);
-	ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
+	data = replicate([ubyte(0)], chunks2.length*minSize);
+	ch = [data].byCDChunk(testPol);
 
 	testWithData(ch, chunks2, true);
 }
 
 @(`ChunkerWithCustomAverageBits`) unittest
 {
-	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
+	auto data = getRandom(23, 32*1024*1024);
+	auto ch = [data].byCDChunk(testPol);
 
 	// sligthly decrease averageBits to get more chunks
 	ch.setAverageBits(19);
@@ -522,8 +525,8 @@ import std.array : replicate;
 
 @(`ChunkerWithCustomMinMax`) unittest
 {
-	auto buf = getRandom(23, 32*1024*1024);
-	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol,
+	auto data = getRandom(23, 32*1024*1024);
+	auto ch = [data].byCDChunk(testPol,
 		(1 << 20) - (1 << 18),
 		(1 << 20) + (1 << 18));
 
@@ -534,8 +537,8 @@ import std.array : replicate;
 // (Check for off-by-one errors.)
 @(`ChunkerMinMaxBounds`) unittest
 {
-	auto buf = getRandom(23, 64*1024);
-	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol,
+	auto data = getRandom(23, 64*1024);
+	auto ch = [data].byCDChunk(testPol,
 		RabinHash.windowSize * 2 - 2,
 		RabinHash.windowSize * 2 + 2);
 	ch.setAverageBits(7);
@@ -555,7 +558,7 @@ import std.stdio : stderr;
 @(`ChunkerWithRandomPolynomial`) unittest
 {
 	// setup data source
-	auto buf = getRandom(23, 32*1024*1024);
+	auto data = getRandom(23, 32*1024*1024);
 
 	// generate a new random polynomial
 	import std.datetime.systime : Clock, SysTime;
@@ -564,7 +567,7 @@ import std.stdio : stderr;
 	stderr.writefln!"generating random polynomial took %s"(Clock.currTime() - start);
 
 	start = Clock.currTime();
-	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), p);
+	auto ch = [data].byCDChunk(p);
 	stderr.writefln!"creating chunker took %s"(Clock.currTime() - start);
 
 	// make sure that first chunk is different
@@ -583,9 +586,9 @@ import std.stdio : stderr;
 @(`ChunkerWithoutHash`) unittest
 {
 	// setup data source
-	auto buf = getRandom(23, 32*1024*1024);
+	auto data = getRandom(23, 32*1024*1024);
 
-	auto ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
+	auto ch = [data].byCDChunk(testPol);
 	auto chunks = testWithData(ch, chunks1, false);
 
 	// test reader
@@ -595,14 +598,14 @@ import std.stdio : stderr;
 			format!"reader returned wrong number of bytes: expected %d, got %d"
 			(chunks1[i].length, c.data.length));
 
-		assert(buf[c.start .. c.start+c.length] == c.data,
+		assert(data[c.start .. c.start+c.length] == c.data,
 			format!"invalid data for chunk returned: expected %(%02x%), got %(%02x%)"
-			(buf[c.start .. c.start+c.length], c.data));
+			(data[c.start .. c.start+c.length], c.data));
 	}
 
 	// setup nullbyte data source
-	buf = replicate([ubyte(0)], chunks2.length*minSize);
-	ch = byCDChunk(bufFile(buf).byChunk(chunkerBufSize), testPol);
+	data = replicate([ubyte(0)], chunks2.length*minSize);
+	ch = [data].byCDChunk(testPol);
 
 	testWithData(ch, chunks2, false);
 }
@@ -616,7 +619,7 @@ version (benchmarkChunker)
 	{
 		auto size = 32 * 1024 * 1024;
 		auto buf = new ubyte[maxSize];
-		auto rd = bufFile(getRandom(23, size));
+		auto data = [getRandom(23, size)];
 
 		// b.SetBytes(long(size));
 
@@ -624,8 +627,7 @@ version (benchmarkChunker)
 		Benchmark.benchmark({
 			chunks = 0;
 
-			rd.seek(0);
-			auto ch = byCDChunk(rd.byChunk(chunkerBufSize), testPol);
+			auto ch = data.byCDChunk(testPol);
 
 			auto cur = 0;
 			while (true)
@@ -674,9 +676,10 @@ version (benchmarkChunker)
 	void benchmarkNewChunker()
 	{
 		auto p = Pol.getRandom();
+		ubyte[][] buf;
 
 		Benchmark.benchmark({
-			byCDChunk(bufFile(null).byChunk(chunkerBufSize), p);
+			buf.byCDChunk(p);
 		});
 	}
 }

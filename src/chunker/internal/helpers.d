@@ -23,11 +23,3 @@ ubyte[] getRandom(int seed, int count)
 
 	return buf;
 }
-
-// Temporary D shim
-import std.stdio : File;
-File bufFile(ubyte[] buf)
-{
-	File("temp.bin", "wb").rawWrite(buf);
-	return File("temp.bin", "rb");
-}

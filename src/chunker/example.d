@@ -1,18 +1,22 @@
 module chunker.example;
 
+import std.stdio : File, writefln;
+import std.digest.sha : sha256Of;
+
 import chunker;
 import chunker.polynomials;
-import chunker.internal.helpers : getRandom, bufFile;
+import chunker.internal.helpers : getRandom;
 
 void main()
 {
-	import std.stdio, std.digest.sha;
-
 	// generate 32MiB of deterministic pseudo-random data
 	auto data = getRandom(23, 32*1024*1024);
+	File("temp.bin", "wb").rawWrite(data);
 
 	// create a chunker
-	auto chunker = byCDChunk(bufFile(data).byChunk(512*1024), Pol(0x3DA3358B4DC173));
+	auto chunker = File("temp.bin", "rb")
+		.byChunk(512 * 1024)
+		.byCDChunk(Pol(0x3DA3358B4DC173));
 
 	// reuse this buffer
 	auto buf = new ubyte[8*1024*1024];
