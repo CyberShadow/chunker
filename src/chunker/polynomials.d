@@ -455,11 +455,12 @@ struct Pol
 
 	/// Returns a new random irreducible polynomial of degree 53 using
 	/// the default `rndGen` as source.  It is equivalent to calling
-	/// `derive(rndGen)`.
+	/// `derive(generate!(() => uniform!ubyte))`.
 	public static Pol getRandom()
 	{
-		import std.random : rndGen;
-		return derive(rndGen);
+		import std.random : uniform;
+		import std.range : generate;
+		return derive(generate!(() => uniform!ubyte));
 	}
 
 	unittest
@@ -481,15 +482,20 @@ struct Pol
 	/// `F_2[X]`, c.f. Michael O. Rabin (1981): "Fingerprinting by Random
 	/// Polynomials", page 4. If no polynomial could be found in one
 	/// million tries, an error is returned.
-	public static Pol derive(Random)(Random source)
+	public static Pol derive(R)(R source)
+	if (is (typeof(source.front) == ubyte))
 	{
 		foreach (i; 0 .. randPolMaxTries)
 		{
 			Pol f;
 
 			// choose polynomial at (pseudo)random
-			import std.random : uniform;
-			f = Pol(uniform!Base(source));
+			f.value = 0;
+			foreach (b; 0 .. Base.sizeof)
+			{
+				f.value = (f.value << 8) | source.front;
+				source.popFront();
+			}
 
 			// mask away bits above bit 53
 			f.value &= Base((1L << 54) - 1);
