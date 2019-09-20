@@ -554,6 +554,26 @@ import std.array : replicate;
 	testWithData(ch, chunks4, true);
 }
 
+// Ensure the min/max bounds are strictly followed.
+// (Check for off-by-one errors.)
+@(`ChunkerMinMaxBounds`) unittest
+{
+	auto buf = getRandom(23, 64*1024);
+	auto ch = Chunker!File(bufFile(buf), testPol,
+		RabinHash.windowSize * 2 - 2,
+		RabinHash.windowSize * 2 + 2);
+	ch.setAverageBits(7);
+
+	size_t[] sizes;
+	for (auto chunk = ch.next(null); chunk !is typeof(chunk).init; chunk = ch.next(null))
+		if (chunk.length != RabinHash.windowSize * 2 + 2)
+			sizes ~= chunk.length;
+
+	assert(sizes == [
+			126, 129, 126, 127, 128, 128, 126, 126, 127, 129,
+			129, 128, 127, 128, 126, 129, 126, 129, 128, 127, 67]);
+}
+
 import std.stdio : stderr;
 
 @(`ChunkerWithRandomPolynomial`) unittest
