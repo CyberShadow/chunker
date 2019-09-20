@@ -118,60 +118,57 @@ struct Chunker(R)
 		ulong cut;
 	}
 
-	private struct State
+	private // internal state
 	{
 		/// Current hash internal state.
-		private RabinHash hash;
+		RabinHash hash;
 
 		/// Buffer used to copy chunk data to.
-		private ubyte[] cbuf;
+		ubyte[] cbuf;
 		/// Buffer used to receive and keep read data in.
-		private ubyte[] buf;
+		ubyte[] buf;
 		/// Current read position within `buf`.
-		private size_t bpos;
+		size_t bpos;
 
 		/// Start offset of the current chunk.
-		private size_t start;
+		size_t start;
 		/// Number of bytes within the current chunk.
-		private @property size_t count() { return pos - start; }
+		@property size_t count() { return pos - start; }
 		/// Current position within the stream.
-		private size_t pos;
+		size_t pos;
 
 		/// Skip this many bytes before calculating a new chunk.
-		private size_t pre;
+		size_t pre;
 	}
 
-	private struct Config
+	private // configuration
 	{
 		/// Minimum and maximum chunk sizes, as configured.
-		public size_t minSize, maxSize;
+		size_t minSize, maxSize;
 
 		/// Hash mask used to decide chunk boundaries.
 		/// By default `(1 << 20) - 1`, or configured from `averageBits`.
-		private ulong splitmask;
+		ulong splitmask;
 
 		/// Input data source.
-		private R rd;
+		R rd;
 	}
-
-	private Config config;
-	private State state;
 
 	/// Probably use the `byCDChunk` convenience function instead of this constructor directly.
 	/// Note that `Chunker` will `popFront` the input range during construction.
 	public this(R rd, Pol pol, uint averageBits, size_t min, size_t max, ubyte[] cbuf)
 	{
-		state.cbuf = cbuf ? cbuf : new ubyte[max];
-		config.rd = rd;
-		config.minSize = min;
-		config.maxSize = max;
-		config.splitmask = (1L << averageBits) - 1;
-		state.hash = RabinHash(pol);
-		if (config.rd.empty)
+		this.cbuf = cbuf ? cbuf : new ubyte[max];
+		this.rd = rd;
+		this.minSize = min;
+		this.maxSize = max;
+		this.splitmask = (1L << averageBits) - 1;
+		this.hash = RabinHash(pol);
+		if (this.rd.empty)
 			empty = true;
 		else
 		{
-			state.buf = config.rd.front;
+			this.buf = this.rd.front;
 			popFront();
 		}
 	}
@@ -181,13 +178,13 @@ struct Chunker(R)
 
 	private void copyBytes(size_t numBytes)
 	{
-		auto bytes = state.buf[state.bpos .. state.bpos + numBytes];
-		state.bpos += numBytes;
-		auto newLen = state.count + bytes.length;
-		if (state.cbuf.length < newLen)
-			state.cbuf.length = newLen;
-		state.cbuf[state.count .. newLen] = bytes[];
-		state.pos += numBytes;
+		auto bytes = this.buf[this.bpos .. this.bpos + numBytes];
+		this.bpos += numBytes;
+		auto newLen = this.count + bytes.length;
+		if (this.cbuf.length < newLen)
+			this.cbuf.length = newLen;
+		this.cbuf[this.count .. newLen] = bytes[];
+		this.pos += numBytes;
 	}
 
 	/// Updates `front` to contain the position and data of the next
@@ -197,33 +194,33 @@ struct Chunker(R)
 	{
 		assert(!empty);
 
-		state.hash.start();
-		state.hash.slide(1);
-		state.start = state.pos;
+		this.hash.start();
+		this.hash.slide(1);
+		this.start = this.pos;
 		// do not start a new chunk unless at least minSize bytes have been read
-		state.pre = config.minSize - RabinHash.windowSize;
-		auto minSize = config.minSize;
-		auto maxSize = config.maxSize;
+		this.pre = this.minSize - RabinHash.windowSize;
+		auto minSize = this.minSize;
+		auto maxSize = this.maxSize;
 
 		while (true)
 		{
-			if (state.bpos >= state.buf.length)
+			if (this.bpos >= this.buf.length)
 			{
-				if (config.rd.empty)
+				if (this.rd.empty)
 				{
 					// Last chunk has been read.
 					empty = true;
 					return;
 				}
 
-				config.rd.popFront();
+				this.rd.popFront();
 
-				if (config.rd.empty)
+				if (this.rd.empty)
 				{
 					// There are no more bytes to buffer, so this was
 					// the last chunk. Return current chunk, if any
 					// bytes have been processed.
-					if (state.count > 0)
+					if (this.count > 0)
 						break;
 					else
 					{
@@ -232,36 +229,36 @@ struct Chunker(R)
 					}
 				}
 
-				state.buf = config.rd.front;
-				state.bpos = 0;
+				this.buf = this.rd.front;
+				this.bpos = 0;
 			}
 
-			auto bmax = state.buf.length;
+			auto bmax = this.buf.length;
 
 			// check if bytes have to be dismissed before starting a new chunk
-			if (state.pre > 0)
+			if (this.pre > 0)
 			{
-				auto n = bmax - state.bpos;
-				if (state.pre > n)
+				auto n = bmax - this.bpos;
+				if (this.pre > n)
 				{
-					state.pre -= n;
+					this.pre -= n;
 					copyBytes(n);
 
 					continue;
 				}
 
-				copyBytes(state.pre);
-				state.pre = 0;
+				copyBytes(this.pre);
+				this.pre = 0;
 			}
 
-			auto add = state.count;
-			auto bpos = state.bpos;
+			auto add = this.count;
+			auto bpos = this.bpos;
 			if (add < minSize)
 			{
 				auto warmUp = minSize - add;
 				if (warmUp > bmax - bpos)
 					warmUp = bmax - bpos;
-				state.hash.put(state.buf[bpos .. bpos + warmUp]);
+				this.hash.put(this.buf[bpos .. bpos + warmUp]);
 				add += warmUp;
 				bpos += warmUp;
 			}
@@ -269,20 +266,20 @@ struct Chunker(R)
 			auto toWrite = bmax - bpos;
 			if (add + toWrite > maxSize)
 				toWrite = maxSize - add;
-			auto written = state.hash.putUntil(state.buf[bpos .. bpos + toWrite], config.splitmask);
+			auto written = this.hash.putUntil(this.buf[bpos .. bpos + toWrite], this.splitmask);
 			add += written;
 			if (bpos + written != bmax)
 			{
-				auto i = add - state.count;
+				auto i = add - this.count;
 				copyBytes(i);
 
 				break;
 			}
 
-			auto steps = bmax - state.bpos;
+			auto steps = bmax - this.bpos;
 			copyBytes(steps);
 		}
-		front = Chunk(state.cbuf[0 .. state.count], state.hash.peek());
+		front = Chunk(this.cbuf[0 .. this.count], this.hash.peek());
 	}
 }
 
