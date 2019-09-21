@@ -167,17 +167,6 @@ struct Chunker(R)
 	Chunk front; /// Current chunk.
 	bool empty; /// `true` when there are no more chunks (input range is empty).
 
-	private void copyBytes(size_t numBytes)
-	{
-		auto bytes = this.buf[0 .. numBytes];
-		this.buf = this.buf[numBytes .. $];
-		auto newLen = this.count + bytes.length;
-		if (this.cbuf.length < newLen)
-			this.cbuf.length = newLen;
-		this.cbuf[this.count .. newLen] = bytes[];
-		this.count += numBytes;
-	}
-
 	/// Updates `front` to contain the position and data of the next
 	/// chunk. Note that `Chunker` reuses the chunk buffer, so the
 	/// previous contents of `front.data` will be overwritten.
@@ -192,10 +181,23 @@ struct Chunker(R)
 		auto maxSize = this.maxSize;
 		// do not start a new chunk unless at least minSize bytes have been read
 		auto pre = minSize - RabinHash.windowSize;
+		auto buf = this.buf;
+		scope(success) this.buf = buf;
+
+		void copyBytes(size_t numBytes)
+		{
+			auto bytes = buf[0 .. numBytes];
+			buf = buf[numBytes .. $];
+			auto newLen = this.count + bytes.length;
+			if (this.cbuf.length < newLen)
+				this.cbuf.length = newLen;
+			this.cbuf[this.count .. newLen] = bytes[];
+			this.count += numBytes;
+		}
 
 		while (true)
 		{
-			if (this.buf.length == 0)
+			if (buf.length == 0)
 			{
 				if (this.rd.empty)
 				{
@@ -220,16 +222,16 @@ struct Chunker(R)
 					}
 				}
 
-				this.buf = this.rd.front;
+				buf = this.rd.front;
 			}
 
 			// check if bytes have to be dismissed before starting a new chunk
 			if (pre > 0)
 			{
-				if (pre > this.buf.length)
+				if (pre > buf.length)
 				{
-					pre -= this.buf.length;
-					copyBytes(this.buf.length);
+					pre -= buf.length;
+					copyBytes(buf.length);
 					continue;
 				}
 
@@ -240,27 +242,19 @@ struct Chunker(R)
 			if (this.count < minSize)
 			{
 				auto warmUp = minSize - this.count;
-				if (warmUp > this.buf.length)
-					warmUp = this.buf.length;
-				this.hash.put(this.buf[0 .. warmUp]);
+				if (warmUp > buf.length)
+					warmUp = buf.length;
+				this.hash.put(buf[0 .. warmUp]);
 				copyBytes(warmUp);
 			}
 
-			auto bpos = 0;
-			auto toWrite = this.buf.length - bpos;
-			if (this.count + bpos + toWrite > maxSize)
-				toWrite = maxSize - (this.count + bpos);
-			auto written = this.hash.putUntil(this.buf[bpos .. bpos + toWrite], this.splitmask);
-			if (bpos + written != this.buf.length)
-			{
-				auto i = bpos + written;
-				copyBytes(i);
-
+			auto toWrite = buf.length;
+			if (this.count + toWrite > maxSize)
+				toWrite = maxSize - this.count;
+			auto written = this.hash.putUntil(buf[0 .. toWrite], this.splitmask);
+			copyBytes(written);
+			if (buf.length) // stopped early due to maxSize or mask match
 				break;
-			}
-
-			auto steps = this.buf.length;
-			copyBytes(steps);
 		}
 		front = Chunk(this.cbuf[0 .. this.count], this.hash.peek());
 	}
