@@ -237,34 +237,29 @@ struct Chunker(R)
 				pre = 0;
 			}
 
-			auto bmax = this.buf.length;
-
-			auto add = this.count;
-			auto bpos = 0;
-			if (add < minSize)
+			if (this.count < minSize)
 			{
-				auto warmUp = minSize - add;
-				if (warmUp > bmax - bpos)
-					warmUp = bmax - bpos;
-				this.hash.put(this.buf[bpos .. bpos + warmUp]);
-				add += warmUp;
-				bpos += warmUp;
+				auto warmUp = minSize - this.count;
+				if (warmUp > this.buf.length)
+					warmUp = this.buf.length;
+				this.hash.put(this.buf[0 .. warmUp]);
+				copyBytes(warmUp);
 			}
 
-			auto toWrite = bmax - bpos;
-			if (add + toWrite > maxSize)
-				toWrite = maxSize - add;
+			auto bpos = 0;
+			auto toWrite = this.buf.length - bpos;
+			if (this.count + bpos + toWrite > maxSize)
+				toWrite = maxSize - (this.count + bpos);
 			auto written = this.hash.putUntil(this.buf[bpos .. bpos + toWrite], this.splitmask);
-			add += written;
-			if (bpos + written != bmax)
+			if (bpos + written != this.buf.length)
 			{
-				auto i = add - this.count;
+				auto i = bpos + written;
 				copyBytes(i);
 
 				break;
 			}
 
-			auto steps = bmax;
+			auto steps = this.buf.length;
 			copyBytes(steps);
 		}
 		front = Chunk(this.cbuf[0 .. this.count], this.hash.peek());
