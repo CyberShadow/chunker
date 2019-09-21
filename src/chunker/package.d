@@ -223,24 +223,21 @@ struct Chunker(R)
 				this.buf = this.rd.front;
 			}
 
-			auto bmax = this.buf.length;
-
 			// check if bytes have to be dismissed before starting a new chunk
 			if (pre > 0)
 			{
-				auto n = bmax;
-				if (pre > n)
+				if (pre > this.buf.length)
 				{
-					pre -= n;
-					copyBytes(n);
-
+					pre -= this.buf.length;
+					copyBytes(this.buf.length);
 					continue;
 				}
 
 				copyBytes(pre);
-				bmax -= pre;
 				pre = 0;
 			}
+
+			auto bmax = this.buf.length;
 
 			auto add = this.count;
 			auto bpos = 0;
