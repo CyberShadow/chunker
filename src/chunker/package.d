@@ -292,15 +292,15 @@ private:
 
 import chunker.internal.helpers;
 
-private enum chunkerBufSize = 512 * kiB;
+enum chunkerBufSize = 512 * kiB;
 
-private template parseDigest(string s)
+template parseDigest(string s)
 {
 	import std.conv : hexString;
 	enum ubyte[] parseDigest = cast(ubyte[])hexString!s;
 }
 
-private struct TestChunk
+struct TestChunk
 {
 	public size_t length;
 	public ulong cutFP;
@@ -308,7 +308,7 @@ private struct TestChunk
 }
 
 /// polynomial used for all the tests below
-private enum testPol = Pol(0x3DA3358B4DC173);
+enum testPol = Pol(0x3DA3358B4DC173);
 
 /// created for 32MB of random data out of math/rand's Uint32() seeded by
 /// constant 23
@@ -424,7 +424,7 @@ TestChunk[] chunks4 =
 import std.format : format;
 import std.digest.sha : sha256Of;
 
-private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] testChunks, bool checkDigest, bool copyData = false)
+Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] testChunks, bool checkDigest, bool copyData = false)
 {
 	Chunker!R.Chunk[] chunks;
 
@@ -438,14 +438,14 @@ private Chunker!R.Chunk[] testWithData(R)(ref Chunker!R chnker, TestChunk[] test
 
 		assert(c.cut == chunk.cutFP,
 			format!"Cut fingerprint for chunk %d/%d does not match: expected %016x, got %016x"
-			(i, testChunks.length-1, chunk.cutFP, c.cut));
+			(i, testChunks.length, chunk.cutFP, c.cut));
 
 		if (checkDigest)
 		{
 			auto digest = sha256Of(c.data);
 			assert(chunk.digest == digest,
 				format!"Digest fingerprint for chunk %d/%d does not match: expected %(%02x%), got %(%02x%)"
-				(i, testChunks.length-1, chunk.digest, digest));
+				(i, testChunks.length, chunk.digest, digest));
 		}
 
 		if (copyData)
