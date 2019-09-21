@@ -142,24 +142,24 @@ struct Chunker(R)
 		ulong splitmask;
 
 		/// Input data source.
-		R rd;
+		R source;
 	}
 
 	/// Probably use the `byCDChunk` convenience function instead of this constructor directly.
 	/// Note that `Chunker` will `popFront` the input range during construction.
-	public this(R rd, Pol pol, uint averageBits, size_t min, size_t max, ubyte[] cbuf)
+	public this(R source, Pol pol, uint averageBits, size_t min, size_t max, ubyte[] cbuf)
 	{
 		this.cbuf = cbuf ? cbuf : new ubyte[max];
-		this.rd = rd;
+		this.source = source;
 		this.minSize = min;
 		this.maxSize = max;
 		this.splitmask = (1L << averageBits) - 1;
 		this.hash = RabinHash(pol);
-		if (this.rd.empty)
+		if (this.source.empty)
 			empty = true;
 		else
 		{
-			this.buf = this.rd.front;
+			this.buf = this.source.front;
 			popFront();
 		}
 	}
@@ -199,16 +199,16 @@ struct Chunker(R)
 		{
 			if (buf.length == 0)
 			{
-				if (this.rd.empty)
+				if (this.source.empty)
 				{
 					// Last chunk has been read.
 					empty = true;
 					return;
 				}
 
-				this.rd.popFront();
+				this.source.popFront();
 
-				if (this.rd.empty)
+				if (this.source.empty)
 				{
 					// There are no more bytes to buffer, so this was
 					// the last chunk. Return current chunk, if any
@@ -222,7 +222,7 @@ struct Chunker(R)
 					}
 				}
 
-				buf = this.rd.front;
+				buf = this.source.front;
 			}
 
 			// check if bytes have to be dismissed before starting a new chunk
@@ -261,21 +261,21 @@ struct Chunker(R)
 }
 
 /// Constructs a new `Chunker` based on polynomial `pol` that
-/// reads from `rd`.
+/// reads from `source`.
 /// Params:
 ///   averageBits = Allows to control the frequency of chunk
 ///     discovery: the lower `averageBits`, the higher amount of
 ///     chunks will be identified.  The default value is 20 bits,
 ///     so chunks will be of 1MiB size on average.
-Chunker!R byCDChunk(R)(R rd, Pol pol, uint averageBits = .averageBits, size_t min = minSize, size_t max = maxSize, ubyte[] cbuf = null)
+Chunker!R byCDChunk(R)(R source, Pol pol, uint averageBits = .averageBits, size_t min = minSize, size_t max = maxSize, ubyte[] cbuf = null)
 {
-	return Chunker!R(rd, pol, averageBits, min, max, cbuf);
+	return Chunker!R(source, pol, averageBits, min, max, cbuf);
 }
 
 /// ditto
-Chunker!R byCDChunk(R)(R rd, Pol pol, ubyte[] cbuf)
+Chunker!R byCDChunk(R)(R source, Pol pol, ubyte[] cbuf)
 {
-	return Chunker!R(rd, pol, .averageBits, minSize, maxSize, cbuf);
+	return Chunker!R(source, pol, .averageBits, minSize, maxSize, cbuf);
 }
 
 // -----------------------------------------------------------------------------
