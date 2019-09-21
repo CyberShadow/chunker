@@ -263,10 +263,27 @@ struct Chunker(R)
 /// Constructs a new `Chunker` based on polynomial `pol` that
 /// reads from `source`.
 /// Params:
+///   source = An input range of chunks of bytes, such as that
+///     returned by `File.byChunk` or `ubyte[].chunks` or simply
+///     `ubyte[].only`.
+///   pol = An irreducible polynomial from `F_2[X]`. Use
+///     `Pol.getRandom()` to generate a random one.
 ///   averageBits = Allows to control the frequency of chunk
 ///     discovery: the lower `averageBits`, the higher amount of
 ///     chunks will be identified.  The default value is 20 bits,
 ///     so chunks will be of 1MiB size on average.
+///   minSize = Minimum size of emitted chunks. Chunk boundaries that
+///     occur less than `minSize` bytes from the chunk start are
+///     ignored.
+///   maxSize = Maximum size of emitted chunks. If a chunk boundary is
+///     not encountered after `maxSize` bytes from the chunk start, it
+///     is forcibly split at that point.
+///   cbuf = A buffer to store chunk data. When `null` (default), a
+///     new buffer is allocated on construction of length `maxSize`.
+/// Returns:
+///   An instance of `Chunker`, an input range of `Chunker.Chunk`,
+///   which contains the chunk data, and the fingerprint value when it
+///   was cut.
 Chunker!R byCDChunk(R)(
 	R source,
 	Pol pol,
