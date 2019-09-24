@@ -302,7 +302,7 @@ Chunker!R byCDChunk(R)(R source, Pol pol, ubyte[] cbuf)
 }
 
 // -----------------------------------------------------------------------------
-version(unittest) version = test;
+version(chunkerUnittest) version = test;
 version(benchmarkChunker) version = test;
 version(test):
 private:

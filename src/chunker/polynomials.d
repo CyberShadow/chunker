@@ -13,7 +13,7 @@ struct Pol
 		return Pol(this.value ^ y.value);
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		struct Test
 		{
@@ -83,7 +83,7 @@ struct Pol
 		return Pol(s.to!Base(2));
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		struct Test
 		{
@@ -144,7 +144,7 @@ struct Pol
 		}
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		auto x = Pol(1L << 63);
 		try
@@ -216,7 +216,7 @@ struct Pol
 		return r;
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		Pol x;
 		assert(x.deg == -1,
@@ -277,7 +277,7 @@ struct Pol
 		return s[1 .. $];
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		auto pol = Pol(0x3DA3358B4DC173);
 		auto s = pol.expand();
@@ -332,7 +332,7 @@ struct Pol
 		return divMod(this, d)[0];
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		struct Test
 		{
@@ -394,7 +394,7 @@ struct Pol
 		return divMod(this, d)[1];
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		struct Test
 		{
@@ -463,7 +463,7 @@ struct Pol
 		return derive(generate!(() => uniform!ubyte));
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		getRandom();
 	}
@@ -532,7 +532,7 @@ struct Pol
 		return gcd(f, x % f);
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		struct Test
 		{
@@ -652,7 +652,7 @@ struct Pol
 		];
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		foreach (_, test; irredTests)
 			assert(test.f.irreducible == test.irred,
@@ -697,7 +697,7 @@ struct Pol
 		return res;
 	}
 
-	unittest
+	version(chunkerUnittest) unittest
 	{
 		struct Test
 		{
@@ -764,7 +764,6 @@ version (benchmarkPolynomials)
 			mixin(`private void ` ~ name ~ `() { Pol.` ~ name ~ `(); }`);
 	version = test;
 }
-version(unittest) version = test;
+version(chunkerUnittest) version = test;
 version(test) import std.format : format;
 version(test) import std.stdio : stderr;
-

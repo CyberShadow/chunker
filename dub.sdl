@@ -7,6 +7,10 @@ targetType "library"
 
 excludedSourceFiles "src/chunker/example.d"
 
+configuration "unittest" {
+	versions "chunkerUnittest"
+}
+
 subPackage {
 	name "example"
 	targetType "executable"
