@@ -1,5 +1,5 @@
 /**
-Thin package implements Content Defined Chunking (CDC) based on a rolling
+This package implements Content Defined Chunking (CDC) based on a rolling
 Rabin Checksum.
 
 Choosing a Random Irreducible Polynomial
